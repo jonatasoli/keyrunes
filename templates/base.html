@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{% if title %}{{ title }} - Minha App{% else %}Minha App{% endif %}</title>
+
+  <!-- Femtocat CSS (link direto para o GitHub raw) -->
+  <link rel="stylesheet" href="https://raw.githubusercontent.com/jonatasoli/femtocat-css/main/dist/femtocat.min.css">
+
+  <style>
+    body { padding: 2rem; max-width: 900px; margin: 0 auto; }
+    .card { padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    form > * { margin-bottom: .75rem; display:block; width:100%;}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Minha App</h1>
+    <nav>
+      <a href="/register">Registrar</a> |
+      <a href="/login">Login</a>
+    </nav>
+    <hr/>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>
+    <hr/>
+    <small>Built with Femtocat</small>
+  </footer>
+</body>
+</html>

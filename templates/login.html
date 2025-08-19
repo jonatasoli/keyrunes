@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="card">
+    <h2>Login</h2>
+
+    {% if error %}
+      <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/login" autocomplete="off">
+      <label for="identity">Email ou Username</label>
+      <input id="identity" name="identity" type="text" required />
+
+      <label for="password">Senha</label>
+      <input id="password" name="password" type="password" required />
+
+      <button type="submit">Entrar</button>
+    </form>
+  </section>
+{% endblock %}
