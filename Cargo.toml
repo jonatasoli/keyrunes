@@ -24,3 +24,4 @@ regex = "1"
 tokio-stream = "0.1"
 tower-http = { version = "0.5", features = ["fs", "cors"] }
 url = "2.5.4"
+dotenvy = "0.15.7"
