@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use axum::{
-    Router,
     extract::Extension,
     response::Redirect,
     routing::{get, post},
+    Router,
 };
 use sqlx::postgres::PgPoolOptions;
 use tera::Tera;
@@ -21,6 +21,8 @@ use services::user_service::UserService;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    dotenvy::dotenv().ok();
+
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:password@localhost:5432/postgres".into());
 
