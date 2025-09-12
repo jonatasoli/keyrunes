@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="card">
+    <h2>Dashboard</h2>
+    
+    {% if user %}
+      <div class="alert alert-success">
+        Welcome, <strong>{{ user.username }}</strong>! ({{ user.email }})
+      </div>
+      
+      <h3>Your Groups</h3>
+      <ul>
+        {% for group in user.groups %}
+          <li>{{ group }}</li>
+        {% else %}
+          <li>No groups assigned</li>
+        {% endfor %}
+      </ul>
+      
+      <div style="margin-top: 2rem;">
+        <button onclick="logout()" class="btn btn-secondary">Logout</button>
+        {% if user.first_login %}
+          <a href="/change-password" class="btn btn-warning">Change Password</a>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="alert alert-danger">
+        You are not logged in. Please <a href="/login">login</a> to continue.
+      </div>
+    {% endif %}
+  </section>
+
+  <script>
+    function logout() {
+      localStorage.removeItem('jwt_token');
+      window.location.href = '/login';
+    }
+    
+    // Check if user needs to change password
+    {% if user and user.first_login %}
+      if (confirm('You need to change your password. Would you like to do it now?')) {
+        window.location.href = '/change-password';
+      }
+    {% endif %}
+  </script>
+{% endblock %}

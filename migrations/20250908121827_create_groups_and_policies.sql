@@ -1,26 +1,37 @@
--- Add first_login column to users table
+-- Add first_login and reset_password columns to users table
 ALTER TABLE users 
-ADD COLUMN first_login BOOLEAN NOT NULL DEFAULT FALSE;
+ADD COLUMN first_login BOOLEAN NOT NULL DEFAULT FALSE,
 ADD COLUMN reset_password BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Add unique constraint on email column for ON CONFLICT to work
+-- Note: This is in addition to the existing unique index on lower(email)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = 'users_email_key' AND conrelid = 'users'::regclass
+    ) THEN
+        ALTER TABLE users ADD CONSTRAINT users_email_key UNIQUE (email);
+    END IF;
+END $$;
 
 -- Create groups table
 CREATE TABLE IF NOT EXISTS groups (
     group_id BIGSERIAL PRIMARY KEY,
     external_id UUID NOT NULL DEFAULT gen_random_uuid(),
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS groups_external_id_idx ON groups (external_id);
-CREATE UNIQUE INDEX IF NOT EXISTS groups_name_idx ON groups (name);
 
 -- Create policies table
 CREATE TABLE IF NOT EXISTS policies (
     policy_id BIGSERIAL PRIMARY KEY,
     external_id UUID NOT NULL DEFAULT gen_random_uuid(),
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NOT NULL UNIQUE,
     description TEXT,
     resource VARCHAR(255) NOT NULL,
     action VARCHAR(100) NOT NULL,
@@ -31,7 +42,6 @@ CREATE TABLE IF NOT EXISTS policies (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS policies_external_id_idx ON policies (external_id);
-CREATE UNIQUE INDEX IF NOT EXISTS policies_name_idx ON policies (name);
 CREATE INDEX IF NOT EXISTS policies_resource_action_idx ON policies (resource, action);
 
 -- Create user_groups table (many-to-many)
