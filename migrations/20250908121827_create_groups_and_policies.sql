@@ -95,11 +95,6 @@ BEFORE UPDATE ON policies
 FOR EACH ROW
 EXECUTE PROCEDURE set_updated_at();
 
--- Insert default admin user and groups/policies
-INSERT INTO users (email, username, password_hash, first_login) VALUES 
-    ('admin@admin.com', 'admin', '$argon2id$v=19$m=19456,t=2,p=1$+DUxbVoOcmKBMd4ajKp3Tg$c1UkZ8/fW3sKvOhhEqYCwZ8gLj5M7SqGOEcZYbCf5gg', TRUE)
-ON CONFLICT (email) DO NOTHING;
-
 -- Insert default groups
 INSERT INTO groups (name, description) VALUES 
     ('superadmin', 'Super administrators with full access'),

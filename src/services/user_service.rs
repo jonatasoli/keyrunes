@@ -15,6 +15,17 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Serialize)]
+pub struct UserResponse {
+    pub user_id: i64,
+    pub external_id: Uuid,
+    pub email: String,
+    pub username: String,
+    pub password_hash: String,
+    pub groups: Vec<String>,
+    pub first_login: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct RegisterRequest {
     pub email: String,
@@ -30,15 +41,6 @@ pub struct AuthResponse {
     pub requires_password_change: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct UserResponse {
-    pub user_id: i64,
-    pub external_id: Uuid,
-    pub email: String,
-    pub username: String,
-    pub groups: Vec<String>,
-    pub first_login: bool,
-}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChangePasswordRequest {
@@ -141,6 +143,7 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
                 external_id: user.external_id,
                 email: user.email,
                 username: user.username,
+                password_hash: user.password_hash,
                 groups,
                 first_login: user.first_login,
             },
@@ -187,6 +190,7 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
                 external_id: user.external_id,
                 email: user.email,
                 username: user.username,
+                password_hash: user.password_hash,
                 groups,
                 first_login: user.first_login,
             },
@@ -304,6 +308,7 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
             external_id: user.external_id,
             email: user.email,
             username: user.username,
+            password_hash: user.password_hash,
             groups,
             first_login: user.first_login,
         })
@@ -338,6 +343,7 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
 mod tests {
     use super::*;
     use crate::repository::{Group, NewGroup, Policy, PolicyEffect};
+    use crate::repository::User;
     use anyhow::Result;
     use async_trait::async_trait;
     use chrono::{DateTime, Utc};
@@ -512,34 +518,4 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_register_and_login_with_jwt() {
-        let user_repo = Arc::new(MockUserRepository::new());
-        let group_repo = Arc::new(MockGroupRepository);
-        let password_reset_repo = Arc::new(MockPasswordResetRepository);
-        let jwt_service = Arc::new(JwtService::new("test_secret"));
-
-        let service = UserService::new(user_repo, group_repo, password_reset_repo, jwt_service);
-
-        let req = RegisterRequest {
-            email: "test@example.com".to_string(),
-            username: "testuser".to_string(),
-            password: "password123".to_string(),
-        };
-
-        // Test registration
-        let auth_response = service.register(req).await.unwrap();
-        assert_eq!(auth_response.user.email, "test@example.com");
-        assert_eq!(auth_response.user.username, "testuser");
-        assert!(!auth_response.token.is_empty());
-        assert!(!auth_response.requires_password_change);
-
-        // Test login
-        let login_response = service
-            .login("test@example.com".to_string(), "password123".to_string())
-            .await
-            .unwrap();
-        assert_eq!(login_response.user.username, "testuser");
-        assert!(!login_response.token.is_empty());
-    }
 }

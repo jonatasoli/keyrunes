@@ -2,6 +2,7 @@ use super::*;
 use anyhow::Result;
 use async_trait::async_trait;
 use sqlx::PgPool;
+use crate::repository::User;
 
 pub struct PgUserRepository {
     pub pool: PgPool,
@@ -56,7 +57,7 @@ impl UserRepository for PgUserRepository {
             new_user.email,
             new_user.username,
             new_user.password_hash,
-            new_user.first_login
+            new_user.first_login,
         )
         .fetch_one(&self.pool)
         .await?;
