@@ -1,8 +1,8 @@
 use axum::{
+    Json,
     extract::{Extension, Path},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
 use serde::Serialize;
 use std::sync::Arc;
@@ -245,7 +245,10 @@ pub async fn remove_user_from_group(
     let group_repo = Arc::new(PgGroupRepository::new(pool));
     let group_service = GroupService::new(group_repo);
 
-    match group_service.remove_user_from_group(user_id, group_id).await {
+    match group_service
+        .remove_user_from_group(user_id, group_id)
+        .await
+    {
         Ok(_) => (
             StatusCode::OK,
             Json(serde_json::json!({

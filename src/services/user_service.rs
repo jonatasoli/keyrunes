@@ -31,7 +31,7 @@ pub struct RegisterRequest {
     pub email: String,
     pub username: String,
     pub password: String,
-    pub first_login: bool,
+    pub first_login: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -40,7 +40,6 @@ pub struct AuthResponse {
     pub token: String,
     pub requires_password_change: bool,
 }
-
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChangePasswordRequest {
@@ -342,8 +341,8 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository::{Group, NewGroup, Policy, PolicyEffect};
     use crate::repository::User;
+    use crate::repository::{Group, NewGroup, Policy, PolicyEffect};
     use anyhow::Result;
     use async_trait::async_trait;
     use chrono::{DateTime, Utc};
@@ -517,5 +516,4 @@ mod tests {
             Ok(())
         }
     }
-
 }

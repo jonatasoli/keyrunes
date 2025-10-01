@@ -73,7 +73,7 @@ async fn test_insert_and_find_user() {
         email: "john@test.com".to_string(),
         username: "johndoe".to_string(),
         password_hash: "hashed_password".to_string(),
-        first_login: false,  // Added missing field
+        first_login: false, // Added missing field
     };
 
     // Act - Insert user
@@ -120,7 +120,9 @@ async fn test_update_user_password() {
     let user = repo.insert_user(new_user).await.unwrap();
 
     // Update password
-    repo.update_user_password(user.user_id, "new_hash").await.unwrap();
+    repo.update_user_password(user.user_id, "new_hash")
+        .await
+        .unwrap();
 
     // Verify password was updated
     let updated_user = repo.find_by_id(user.user_id).await.unwrap().unwrap();

@@ -10,7 +10,7 @@ use tera::Context;
 use crate::repository::sqlx_impl::{
     PgGroupRepository, PgPasswordResetRepository, PgUserRepository,
 };
-use crate::services::user_service::{ChangePasswordRequest,RegisterRequest, UserService};
+use crate::services::user_service::{ChangePasswordRequest, RegisterRequest, UserService};
 
 type UserServiceType = UserService<PgUserRepository, PgGroupRepository, PgPasswordResetRepository>;
 
@@ -58,7 +58,7 @@ pub async fn register_post(
         email: payload.email,
         username: payload.username,
         password: payload.password,
-        first_login: payload.first_login,
+        first_login: Some(payload.first_login),
     };
 
     match service.register(req).await {

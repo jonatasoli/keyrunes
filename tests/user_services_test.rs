@@ -80,7 +80,11 @@ impl UserRepository for MockRepo {
             .map(|(_, gid)| Group {
                 group_id: *gid,
                 external_id: Uuid::new_v4(),
-                name: if *gid == 1 { "users".to_string() } else { format!("group_{}", gid) },
+                name: if *gid == 1 {
+                    "users".to_string()
+                } else {
+                    format!("group_{}", gid)
+                },
                 description: None,
                 created_at: Utc::now(),
                 updated_at: Utc::now(),
@@ -182,7 +186,9 @@ async fn test_register_and_login() {
     let user_repo = Arc::new(MockRepo::new());
     let group_repo = Arc::new(MockGroupRepository);
     let password_reset_repo = Arc::new(MockPasswordResetRepository);
-    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new("test_secret"));
+    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new(
+        "test_secret",
+    ));
 
     // Create service
     let service = UserService::new(
@@ -197,7 +203,7 @@ async fn test_register_and_login() {
         email: "john@example.com".to_string(),
         username: "johndoe".to_string(),
         password: "Password123".to_string(),
-        first_login: false,  // Added missing field
+        first_login: Some(false), // Added missing field
     };
 
     // Test registration
@@ -234,7 +240,9 @@ async fn test_duplicate_registration() {
     let user_repo = Arc::new(MockRepo::new());
     let group_repo = Arc::new(MockGroupRepository);
     let password_reset_repo = Arc::new(MockPasswordResetRepository);
-    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new("test_secret"));
+    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new(
+        "test_secret",
+    ));
 
     let service = UserService::new(
         user_repo.clone(),
@@ -247,7 +255,7 @@ async fn test_duplicate_registration() {
         email: "duplicate@example.com".to_string(),
         username: "duplicateuser".to_string(),
         password: "Password123".to_string(),
-        first_login: false,
+        first_login: Some(false),
     };
 
     // First registration should succeed
@@ -256,7 +264,12 @@ async fn test_duplicate_registration() {
     // Second registration with same email should fail
     let result = service.register(req).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("email already registered"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("email already registered")
+    );
 }
 
 #[tokio::test]
@@ -264,21 +277,18 @@ async fn test_password_validation() {
     let user_repo = Arc::new(MockRepo::new());
     let group_repo = Arc::new(MockGroupRepository);
     let password_reset_repo = Arc::new(MockPasswordResetRepository);
-    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new("test_secret"));
+    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new(
+        "test_secret",
+    ));
 
-    let service = UserService::new(
-        user_repo,
-        group_repo,
-        password_reset_repo,
-        jwt_service,
-    );
+    let service = UserService::new(user_repo, group_repo, password_reset_repo, jwt_service);
 
     // Test password too short
     let req = RegisterRequest {
         email: "short@example.com".to_string(),
         username: "shortpass".to_string(),
-        password: "short".to_string(),  // Too short
-        first_login: false,
+        password: "short".to_string(), // Too short
+        first_login: Some(false),
     };
 
     let result = service.register(req).await;
@@ -291,21 +301,18 @@ async fn test_email_validation() {
     let user_repo = Arc::new(MockRepo::new());
     let group_repo = Arc::new(MockGroupRepository);
     let password_reset_repo = Arc::new(MockPasswordResetRepository);
-    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new("test_secret"));
+    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new(
+        "test_secret",
+    ));
 
-    let service = UserService::new(
-        user_repo,
-        group_repo,
-        password_reset_repo,
-        jwt_service,
-    );
+    let service = UserService::new(user_repo, group_repo, password_reset_repo, jwt_service);
 
     // Test invalid email
     let req = RegisterRequest {
-        email: "invalid-email".to_string(),  // Invalid email format
+        email: "invalid-email".to_string(), // Invalid email format
         username: "testuser".to_string(),
         password: "Password123".to_string(),
-        first_login: false,
+        first_login: Some(false),
     };
 
     let result = service.register(req).await;
@@ -318,7 +325,9 @@ async fn test_change_password() {
     let user_repo = Arc::new(MockRepo::new());
     let group_repo = Arc::new(MockGroupRepository);
     let password_reset_repo = Arc::new(MockPasswordResetRepository);
-    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new("test_secret"));
+    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new(
+        "test_secret",
+    ));
 
     let service = UserService::new(
         user_repo.clone(),
@@ -332,7 +341,7 @@ async fn test_change_password() {
         email: "change@example.com".to_string(),
         username: "changeuser".to_string(),
         password: "OldPassword123".to_string(),
-        first_login: true,
+        first_login: Some(true),
     };
 
     let auth_response = service.register(req).await.unwrap();
@@ -348,13 +357,19 @@ async fn test_change_password() {
 
     // Verify login with new password
     let login_result = service
-        .login("change@example.com".to_string(), "NewPassword456".to_string())
+        .login(
+            "change@example.com".to_string(),
+            "NewPassword456".to_string(),
+        )
         .await;
     assert!(login_result.is_ok());
 
     // Verify login with old password fails
     let old_login_result = service
-        .login("change@example.com".to_string(), "OldPassword123".to_string())
+        .login(
+            "change@example.com".to_string(),
+            "OldPassword123".to_string(),
+        )
         .await;
     assert!(old_login_result.is_err());
 }
