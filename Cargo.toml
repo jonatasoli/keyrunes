@@ -30,6 +30,7 @@ jsonwebtoken = "9.3.1"
 serde_with = "3.14.0"
 hex = "0.4.3"
 futures = "0.3.31"
+secrecy = { version = "0.10.3", features = ["serde"] }
 
 [dev-dependencies]
 test-case = "3.3.1"

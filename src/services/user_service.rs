@@ -1,3 +1,4 @@
+use crate::domain::user::{Email, Password};
 use crate::repository::{
     GroupRepository, NewPasswordResetToken, NewUser, PasswordResetRepository, UserRepository,
 };
@@ -24,6 +25,14 @@ pub struct UserResponse {
     pub password_hash: String,
     pub groups: Vec<String>,
     pub first_login: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateUserRequest {
+    pub email: Email,
+    pub username: String,
+    pub password: Password,
+    pub groups: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -82,20 +91,21 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
         }
     }
 
-    pub async fn register(&self, req: RegisterRequest) -> Result<AuthResponse> {
-        // Validations
-        let email_re = Regex::new(r"^[\w.+-]+@[\w-]+\.[\w.-]+$").unwrap();
-        if !email_re.is_match(&req.email) {
-            return Err(anyhow!("invalid email"));
-        }
-        if req.password.len() < 8 {
-            return Err(anyhow!("password too short"));
-        }
-
+    pub async fn create_user(
+        &self,
+        req: CreateUserRequest,
+        admin_id: Option<i64>,
+    ) -> Result<UserResponse> {
         // Check uniqueness
-        if self.user_repo.find_by_email(&req.email).await?.is_some() {
+        if self
+            .user_repo
+            .find_by_email(req.email.as_ref())
+            .await?
+            .is_some()
+        {
             return Err(anyhow!("email already registered"));
         }
+
         if self
             .user_repo
             .find_by_username(&req.username)
@@ -105,12 +115,14 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
             return Err(anyhow!("username taken"));
         }
 
+        let group_ids = self.into_group_ids(&req.groups).await?;
+
         // Hash password
-        let password_hash = self.hash_password(&req.password)?;
+        let password_hash = self.hash_password(req.password.expose())?;
 
         let new_user = NewUser {
             external_id: Uuid::new_v4(),
-            email: req.email,
+            email: req.email.to_string(),
             username: req.username,
             password_hash,
             first_login: false,
@@ -118,37 +130,53 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
 
         let user = self.user_repo.insert_user(new_user).await?;
 
-        // Assign to 'users' group by default
-        if let Ok(Some(users_group)) = self.group_repo.find_by_name("users").await {
-            let _ = self
-                .group_repo
-                .assign_user_to_group(user.user_id, users_group.group_id, None)
-                .await;
-        }
+        self.group_repo
+            .assign_user_to_groups(user.user_id, &group_ids[..], admin_id)
+            .await?;
 
         // Get user groups for JWT
         let groups = self.get_user_group_names(user.user_id).await?;
+
+        Ok(UserResponse {
+            user_id: user.user_id,
+            external_id: user.external_id,
+            email: user.email,
+            username: user.username,
+            password_hash: user.password_hash,
+            groups,
+            first_login: user.first_login,
+        })
+    }
+
+    pub async fn register(&self, req: RegisterRequest) -> Result<AuthResponse> {
+        // creat user
+        let user = self
+            .create_user(
+                CreateUserRequest {
+                    email: Email::try_from(req.email.as_str())?,
+                    username: req.username,
+                    password: Password::try_from(req.password.as_str())?,
+                    // Assign to 'users' group by default
+                    groups: vec!["users".to_string()],
+                },
+                None,
+            )
+            .await?;
 
         // Generate JWT token
         let token = self.jwt_service.generate_token(
             user.user_id,
             &user.email,
             &user.username,
-            groups.clone(),
+            user.groups.clone(),
         )?;
 
+        let requires_password_change = user.first_login;
+
         Ok(AuthResponse {
-            user: UserResponse {
-                user_id: user.user_id,
-                external_id: user.external_id,
-                email: user.email,
-                username: user.username,
-                password_hash: user.password_hash,
-                groups,
-                first_login: user.first_login,
-            },
+            user,
             token,
-            requires_password_change: user.first_login,
+            requires_password_change,
         })
     }
 
@@ -336,6 +364,20 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
 
     pub async fn cleanup_expired_tokens(&self) -> Result<()> {
         self.password_reset_repo.cleanup_expired_tokens().await
+    }
+
+    async fn into_group_ids(&self, groups: &Vec<String>) -> Result<Vec<i64>> {
+        let mut group_ids = Vec::new();
+
+        for group in groups {
+            if let Ok(Some(users_group)) = self.group_repo.find_by_name(&group).await {
+                group_ids.push(users_group.group_id);
+            } else {
+                return Err(anyhow!("invalid group specified: `{}`", group));
+            }
+        }
+
+        Ok(group_ids)
     }
 }
 

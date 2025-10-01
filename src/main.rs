@@ -13,6 +13,7 @@ use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
 mod api;
+mod domain;
 mod handler;
 mod repository;
 mod services;
@@ -79,6 +80,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/refresh-token", post(api::auth::refresh_token_api))
         .route("/api/me", get(api::auth::me_api))
         .route("/api/change-password", post(api::auth::change_password_api))
+        .route("/api/admin/user", post(api::admin::create_user))
         // se seu middleware precisa de Extensions (jwt_service, pool, user_service),
         // assegure-se de aplicar essas Extensions ANTES do middleware nesta sub-árvore:
         .layer(Extension(jwt_service.clone()))
