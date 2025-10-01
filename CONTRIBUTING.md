@@ -119,10 +119,13 @@ Pull requests are reviewed collaboratively. Be prepared to make changes based on
 
 Community Guidelines
 
-We value respectful and constructive communication. Please follow:
+- We value respectful and constructive communication. Please follow:
 
-Be respectful to all contributors.
+- Be respectful to all contributors.
 
-Provide clear and concise feedback.
+- Provide clear and concise feedback.
 
-Stay on-topic and avoid off-topic discussions in issues/PRs.
+- Stay on-topic and avoid off-topic discussions in issues/PRs.
+
+- Follow the [Code of Conduct](CODE_OF_CONDUCT.md)
+
