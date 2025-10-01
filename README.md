@@ -75,13 +75,18 @@
 ## 📂 Project Structure (Planned)
 
 /src
-/core # Policy engine
-/models # Roles, attributes, relationships
-/parser # Policy-as-code parser (YAML/Rego)
-/sdk # API bindings
-/tests
-/docs
 
+/core # Policy engine
+
+/models # Roles, attributes, relationships
+
+/parser # Policy-as-code parser (YAML/Rego)
+
+/sdk # API bindings
+
+/tests
+
+/docs
 
 ---
 
@@ -94,11 +99,14 @@ Contributions are welcome! If you’re interested in:
 
 …then feel free to open issues, suggest ideas, or contribute code once we’re live 🚀
 
+See in [CONTRIBUTING](CONTRIBUTING.md)
+
 ---
 
 ## 📄 License
 
 [MIT](LICENSE)
+[CODE OF CONDUCT](CODE_OF_CONDUCT.md)
 
 ---
 
