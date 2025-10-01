@@ -1,19 +1,22 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use keyrunes::repository::{NewUser, User, UserRepository};
+use chrono::Utc;
+use keyrunes::repository::{Group, NewUser, Policy, User, UserRepository};
 use keyrunes::services::user_service::{RegisterRequest, UserService};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
-// Mock repository
+// Mock repository implementation
 struct MockRepo {
     users: Mutex<Vec<User>>,
+    groups: Mutex<Vec<(i64, i64)>>, // (user_id, group_id)
 }
 
 impl MockRepo {
     fn new() -> Self {
         Self {
             users: Mutex::new(Vec::new()),
+            groups: Mutex::new(Vec::new()),
         }
     }
 }
@@ -30,54 +33,328 @@ impl UserRepository for MockRepo {
         Ok(users.iter().cloned().find(|u| u.username == username))
     }
 
+    async fn find_by_id(&self, user_id: i64) -> Result<Option<User>> {
+        let users = self.users.lock().unwrap();
+        Ok(users.iter().cloned().find(|u| u.user_id == user_id))
+    }
+
     async fn insert_user(&self, new_user: NewUser) -> Result<User> {
+        let mut users = self.users.lock().unwrap();
         let user = User {
-            user_id: (self.users.lock().unwrap().len() + 1) as i64,
+            user_id: (users.len() + 1) as i64,
             external_id: new_user.external_id,
             email: new_user.email,
             username: new_user.username,
             password_hash: new_user.password_hash,
+            first_login: new_user.first_login,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         };
-        self.users.lock().unwrap().push(user.clone());
+        users.push(user.clone());
         Ok(user)
+    }
+
+    async fn update_user_password(&self, user_id: i64, new_password_hash: &str) -> Result<()> {
+        let mut users = self.users.lock().unwrap();
+        if let Some(user) = users.iter_mut().find(|u| u.user_id == user_id) {
+            user.password_hash = new_password_hash.to_string();
+            user.updated_at = Utc::now();
+        }
+        Ok(())
+    }
+
+    async fn set_first_login(&self, user_id: i64, first_login: bool) -> Result<()> {
+        let mut users = self.users.lock().unwrap();
+        if let Some(user) = users.iter_mut().find(|u| u.user_id == user_id) {
+            user.first_login = first_login;
+            user.updated_at = Utc::now();
+        }
+        Ok(())
+    }
+
+    async fn get_user_groups(&self, user_id: i64) -> Result<Vec<Group>> {
+        let groups = self.groups.lock().unwrap();
+        let user_groups: Vec<Group> = groups
+            .iter()
+            .filter(|(uid, _)| *uid == user_id)
+            .map(|(_, gid)| Group {
+                group_id: *gid,
+                external_id: Uuid::new_v4(),
+                name: if *gid == 1 { "users".to_string() } else { format!("group_{}", gid) },
+                description: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            })
+            .collect();
+        Ok(user_groups)
+    }
+
+    async fn get_user_policies(&self, _user_id: i64) -> Result<Vec<Policy>> {
+        Ok(Vec::new())
+    }
+
+    async fn get_user_all_policies(&self, _user_id: i64) -> Result<Vec<Policy>> {
+        Ok(Vec::new())
+    }
+}
+
+// Mock Group Repository
+struct MockGroupRepository;
+
+#[async_trait]
+impl keyrunes::repository::GroupRepository for MockGroupRepository {
+    async fn find_by_name(&self, name: &str) -> Result<Option<Group>> {
+        if name == "users" {
+            Ok(Some(Group {
+                group_id: 1,
+                external_id: Uuid::new_v4(),
+                name: name.to_string(),
+                description: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn find_by_id(&self, _group_id: i64) -> Result<Option<Group>> {
+        Ok(None)
+    }
+
+    async fn insert_group(&self, _new_group: keyrunes::repository::NewGroup) -> Result<Group> {
+        unimplemented!()
+    }
+
+    async fn list_groups(&self) -> Result<Vec<Group>> {
+        Ok(Vec::new())
+    }
+
+    async fn assign_user_to_group(
+        &self,
+        _user_id: i64,
+        _group_id: i64,
+        _assigned_by: Option<i64>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn remove_user_from_group(&self, _user_id: i64, _group_id: i64) -> Result<()> {
+        Ok(())
+    }
+
+    async fn get_group_policies(&self, _group_id: i64) -> Result<Vec<Policy>> {
+        Ok(Vec::new())
+    }
+}
+
+// Mock Password Reset Repository
+struct MockPasswordResetRepository;
+
+#[async_trait]
+impl keyrunes::repository::PasswordResetRepository for MockPasswordResetRepository {
+    async fn create_reset_token(
+        &self,
+        _token: keyrunes::repository::NewPasswordResetToken,
+    ) -> Result<keyrunes::repository::PasswordResetToken> {
+        unimplemented!()
+    }
+
+    async fn find_valid_token(
+        &self,
+        _token: &str,
+    ) -> Result<Option<keyrunes::repository::PasswordResetToken>> {
+        Ok(None)
+    }
+
+    async fn mark_token_used(&self, _token_id: i64) -> Result<()> {
+        Ok(())
+    }
+
+    async fn cleanup_expired_tokens(&self) -> Result<()> {
+        Ok(())
     }
 }
 
 #[tokio::test]
 async fn test_register_and_login() {
-    // Setup
-    let repo = Arc::new(MockRepo::new());
-    let service = UserService::new(repo.clone());
+    // Setup repositories
+    let user_repo = Arc::new(MockRepo::new());
+    let group_repo = Arc::new(MockGroupRepository);
+    let password_reset_repo = Arc::new(MockPasswordResetRepository);
+    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new("test_secret"));
 
+    // Create service
+    let service = UserService::new(
+        user_repo.clone(),
+        group_repo,
+        password_reset_repo,
+        jwt_service,
+    );
+
+    // Create registration request
     let req = RegisterRequest {
         email: "john@example.com".to_string(),
         username: "johndoe".to_string(),
         password: "Password123".to_string(),
+        first_login: false,  // Added missing field
     };
 
-    // Act - Assert
-    let user = service.register(req.clone()).await.unwrap();
-    assert_eq!(user.email, "john@example.com");
-    assert_eq!(user.username, "johndoe");
+    // Test registration
+    let auth_response = service.register(req.clone()).await.unwrap();
+    assert_eq!(auth_response.user.email, "john@example.com");
+    assert_eq!(auth_response.user.username, "johndoe");
+    assert!(!auth_response.token.is_empty());
 
-    // Act - Assert
-    let login_user = service
+    // Test login with email
+    let login_response = service
         .login("john@example.com".to_string(), "Password123".to_string())
         .await
         .unwrap();
-    assert_eq!(login_user.username, "johndoe");
+    assert_eq!(login_response.user.username, "johndoe");
+    assert!(!login_response.token.is_empty());
 
-    // Act - Assert
-    let login_user2 = service
+    // Test login with username
+    let login_response2 = service
         .login("johndoe".to_string(), "Password123".to_string())
         .await
         .unwrap();
-    assert_eq!(login_user2.email, "john@example.com");
+    assert_eq!(login_response2.user.email, "john@example.com");
 
-    // Act - Assert
+    // Test login with wrong password
     let err = service
         .login("johndoe".to_string(), "wrongpass".to_string())
         .await
         .unwrap_err();
     assert_eq!(err.to_string(), "invalid credentials");
+}
+
+#[tokio::test]
+async fn test_duplicate_registration() {
+    let user_repo = Arc::new(MockRepo::new());
+    let group_repo = Arc::new(MockGroupRepository);
+    let password_reset_repo = Arc::new(MockPasswordResetRepository);
+    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new("test_secret"));
+
+    let service = UserService::new(
+        user_repo.clone(),
+        group_repo,
+        password_reset_repo,
+        jwt_service,
+    );
+
+    let req = RegisterRequest {
+        email: "duplicate@example.com".to_string(),
+        username: "duplicateuser".to_string(),
+        password: "Password123".to_string(),
+        first_login: false,
+    };
+
+    // First registration should succeed
+    service.register(req.clone()).await.unwrap();
+
+    // Second registration with same email should fail
+    let result = service.register(req).await;
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("email already registered"));
+}
+
+#[tokio::test]
+async fn test_password_validation() {
+    let user_repo = Arc::new(MockRepo::new());
+    let group_repo = Arc::new(MockGroupRepository);
+    let password_reset_repo = Arc::new(MockPasswordResetRepository);
+    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new("test_secret"));
+
+    let service = UserService::new(
+        user_repo,
+        group_repo,
+        password_reset_repo,
+        jwt_service,
+    );
+
+    // Test password too short
+    let req = RegisterRequest {
+        email: "short@example.com".to_string(),
+        username: "shortpass".to_string(),
+        password: "short".to_string(),  // Too short
+        first_login: false,
+    };
+
+    let result = service.register(req).await;
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err().to_string(), "password too short");
+}
+
+#[tokio::test]
+async fn test_email_validation() {
+    let user_repo = Arc::new(MockRepo::new());
+    let group_repo = Arc::new(MockGroupRepository);
+    let password_reset_repo = Arc::new(MockPasswordResetRepository);
+    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new("test_secret"));
+
+    let service = UserService::new(
+        user_repo,
+        group_repo,
+        password_reset_repo,
+        jwt_service,
+    );
+
+    // Test invalid email
+    let req = RegisterRequest {
+        email: "invalid-email".to_string(),  // Invalid email format
+        username: "testuser".to_string(),
+        password: "Password123".to_string(),
+        first_login: false,
+    };
+
+    let result = service.register(req).await;
+    assert!(result.is_err());
+    assert_eq!(result.unwrap_err().to_string(), "invalid email");
+}
+
+#[tokio::test]
+async fn test_change_password() {
+    let user_repo = Arc::new(MockRepo::new());
+    let group_repo = Arc::new(MockGroupRepository);
+    let password_reset_repo = Arc::new(MockPasswordResetRepository);
+    let jwt_service = Arc::new(keyrunes::services::jwt_service::JwtService::new("test_secret"));
+
+    let service = UserService::new(
+        user_repo.clone(),
+        group_repo,
+        password_reset_repo,
+        jwt_service,
+    );
+
+    // Register a user
+    let req = RegisterRequest {
+        email: "change@example.com".to_string(),
+        username: "changeuser".to_string(),
+        password: "OldPassword123".to_string(),
+        first_login: true,
+    };
+
+    let auth_response = service.register(req).await.unwrap();
+    let user_id = auth_response.user.user_id;
+
+    // Change password
+    let change_req = keyrunes::services::user_service::ChangePasswordRequest {
+        current_password: "OldPassword123".to_string(),
+        new_password: "NewPassword456".to_string(),
+    };
+
+    service.change_password(user_id, change_req).await.unwrap();
+
+    // Verify login with new password
+    let login_result = service
+        .login("change@example.com".to_string(), "NewPassword456".to_string())
+        .await;
+    assert!(login_result.is_ok());
+
+    // Verify login with old password fails
+    let old_login_result = service
+        .login("change@example.com".to_string(), "OldPassword123".to_string())
+        .await;
+    assert!(old_login_result.is_err());
 }

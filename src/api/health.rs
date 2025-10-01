@@ -1,6 +1,6 @@
 use axum::{Json, extract::Extension, http::StatusCode, response::IntoResponse};
 use chrono::Utc;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
 use std::time::SystemTime;
 
@@ -160,7 +160,8 @@ fn check_services_health() -> ServicesHealth {
     }
 }
 
-fn test_jwt_service() -> Result<(), Box<dyn std::error::Error>> {
+// Made public for tests
+pub fn test_jwt_service() -> Result<(), Box<dyn std::error::Error>> {
     use crate::services::jwt_service::JwtService;
 
     let jwt_service = JwtService::new("test_secret");
@@ -169,7 +170,8 @@ fn test_jwt_service() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn test_password_hashing() -> Result<(), Box<dyn std::error::Error>> {
+// Made public for tests
+pub fn test_password_hashing() -> Result<(), Box<dyn std::error::Error>> {
     use argon2::{
         Argon2,
         password_hash::{PasswordHasher, SaltString},
@@ -182,7 +184,6 @@ fn test_password_hashing() -> Result<(), Box<dyn std::error::Error>> {
     let salt = SaltString::generate(thread_rng());
     let argon2 = Argon2::default();
 
-    // gerar hash (pode retornar password_hash::Error)
     let hash = match argon2.hash_password(password.as_bytes(), &salt) {
         Ok(h) => h,
         Err(e) => {
@@ -193,10 +194,7 @@ fn test_password_hashing() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // <-- aqui: materializamos a string para estender a lifetime
     let hash_string = hash.to_string();
-
-    // parse do hash; agora passamos uma referência para hash_string (que vive até o fim da função)
     let parsed_hash = match PasswordHash::new(&hash_string) {
         Ok(p) => p,
         Err(e) => {
@@ -207,7 +205,6 @@ fn test_password_hashing() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    // verificar senha (parsed_hash pode conter referências para hash_string, por isso hash_string deve viver)
     if let Err(e) = argon2.verify_password(password.as_bytes(), &parsed_hash) {
         return Err(Box::new(io::Error::new(
             io::ErrorKind::Other,
@@ -221,7 +218,6 @@ fn test_password_hashing() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sqlx::PgPool;
 
     #[test]
     fn test_jwt_service_health() {
