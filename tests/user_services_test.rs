@@ -266,7 +266,7 @@ async fn test_register_and_login() {
         email: "john@example.com".to_string(),
         username: "johndoe".to_string(),
         password: "Password123".to_string(),
-        first_login: false, // Added missing field
+        first_login: Some(false), // Added missing field
     };
 
     // Test registration
@@ -325,7 +325,7 @@ async fn test_duplicate_registration() {
         email: "duplicate@example.com".to_string(),
         username: "duplicateuser".to_string(),
         password: "Password123".to_string(),
-        first_login: false,
+        first_login: Some(false),
     };
 
     // First registration should succeed
@@ -365,7 +365,7 @@ async fn test_password_validation() {
         email: "short@example.com".to_string(),
         username: "shortpass".to_string(),
         password: "short".to_string(), // Too short
-        first_login: false,
+        first_login: Some(false),
     };
 
     let result = service.register(req).await;
@@ -396,7 +396,7 @@ async fn test_email_validation() {
         email: "invalid-email".to_string(), // Invalid email format
         username: "testuser".to_string(),
         password: "Password123".to_string(),
-        first_login: false,
+        first_login: Some(false),
     };
 
     let result = service.register(req).await;
@@ -432,7 +432,7 @@ async fn test_change_password() {
         email: "change@example.com".to_string(),
         username: "changeuser".to_string(),
         password: "OldPassword123".to_string(),
-        first_login: true,
+        first_login: Some(true),
     };
 
     let auth_response = service.register(req).await.unwrap();

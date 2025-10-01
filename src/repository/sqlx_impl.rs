@@ -1,8 +1,8 @@
 use super::*;
+use crate::repository::User;
 use anyhow::Result;
 use async_trait::async_trait;
 use sqlx::PgPool;
-use crate::repository::User;
 
 pub struct PgUserRepository {
     pub pool: PgPool,

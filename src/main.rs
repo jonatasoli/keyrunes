@@ -67,8 +67,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/health", get(api::health::health_check))
         .route("/api/health/ready", get(api::health::readiness_check))
         .route("/api/health/live", get(api::health::liveness_check))
-        .route("/register", get(views::auth::register_page).post(views::auth::register_post))
-        .route("/login", get(views::auth::login_page).post(views::auth::login_post))
+        .route(
+            "/register",
+            get(views::auth::register_page).post(views::auth::register_post),
+        )
+        .route(
+            "/login",
+            get(views::auth::login_page).post(views::auth::login_post),
+        )
         .route("/reset-password", get(api::auth::reset_password_page))
         .nest_service("/static", ServeDir::new("./static"));
     let protected_router = Router::new()

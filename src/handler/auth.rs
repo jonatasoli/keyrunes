@@ -70,10 +70,7 @@ pub async fn optional_auth(
 
 /// Middleware that requires superadmin group
 /// NOTE: This should be used AFTER require_auth middleware
-pub async fn require_superadmin(
-    request: Request,
-    next: Next,
-) -> Response {
+pub async fn require_superadmin(request: Request, next: Next) -> Response {
     // Check if user is authenticated
     if let Some(user) = request.extensions().get::<AuthenticatedUser>() {
         if user.groups.contains(&"superadmin".to_string()) {
@@ -81,25 +78,25 @@ pub async fn require_superadmin(
         }
         return (StatusCode::FORBIDDEN, "Superadmin access required").into_response();
     }
-    
+
     (StatusCode::UNAUTHORIZED, "Authentication required").into_response()
 }
 
 /// Check if user has specific group
 /// NOTE: This should be used AFTER require_auth middleware
-pub async fn require_group(
-    group_name: &str,
-    request: Request,
-    next: Next,
-) -> Response {
+pub async fn require_group(group_name: &str, request: Request, next: Next) -> Response {
     // Check if user is authenticated
     if let Some(user) = request.extensions().get::<AuthenticatedUser>() {
         if user.groups.contains(&group_name.to_string()) {
             return next.run(request).await;
         }
-        return (StatusCode::FORBIDDEN, format!("Group '{}' membership required", group_name)).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            format!("Group '{}' membership required", group_name),
+        )
+            .into_response();
     }
-    
+
     (StatusCode::UNAUTHORIZED, "Authentication required").into_response()
 }
 

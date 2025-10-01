@@ -75,7 +75,7 @@ pub async fn register_api(
         email: payload.email,
         username: payload.username,
         password: payload.password,
-        first_login: false,
+        first_login: Some(true),
     };
 
     match service.register(req).await {

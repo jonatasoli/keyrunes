@@ -66,10 +66,13 @@ async fn main() -> anyhow::Result<()> {
                 email,
                 username,
                 password,
-                first_login,
+                first_login: Some(first_login),
             };
             match service.register(req).await {
-                Ok(u) => println!("Created user {} (external_id={})", u.user.user_id, u.user.external_id),
+                Ok(u) => println!(
+                    "Created user {} (external_id={})",
+                    u.user.user_id, u.user.external_id
+                ),
                 Err(e) => eprintln!("Error registering user: {}", e),
             }
         }
