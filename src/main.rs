@@ -109,7 +109,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("  • Health: /api/health, /api/health/ready, /api/health/live");
     tracing::info!("  • Public: /login, /register, /reset-password");
     tracing::info!("  • Protected: /dashboard, /change-password");
-    tracing::info!("  • API: /api/login, /api/register, /api/me, /api/refresh-token");
+    tracing::info!("  • API: /api/login, /api/register, /api/me, /api/refresh-token, /api/admin/user");
 
     axum::serve(listener, app).await.unwrap();
 
