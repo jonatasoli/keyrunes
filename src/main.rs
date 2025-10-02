@@ -99,7 +99,6 @@ async fn main() -> anyhow::Result<()> {
         .layer(Extension(jwt_service.clone()))
         .layer(Extension(user_service.clone()))
         .layer(Extension(pool.clone()));
-    // .layer(from_fn(require_superadmin));
     let app = Router::new()
         // Pages
         .merge(public_router)
