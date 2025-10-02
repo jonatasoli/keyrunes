@@ -498,7 +498,8 @@ async fn admin_create_user_with_groups() {
                 username: "admin".to_string(),
                 password: Password::try_from("Password123").unwrap(),
                 // Assign to 'superadmin' group by default
-                groups: vec!["superadmin".to_string()],
+                groups: Some(vec!["superadmin".to_string()]),
+                first_login: false,
             },
             None,
         )
@@ -524,7 +525,8 @@ async fn admin_create_user_with_groups() {
                 email: Email::try_from("testuser@example.com").unwrap(),
                 username: "testuser".to_string(),
                 password: Password::try_from("Password123").unwrap(),
-                groups: vec!["users".to_string(), test_group.name],
+                groups: Some(vec!["users".to_string(), test_group.name]),
+                first_login: false,
             },
             Some(superadmin.user_id),
         )
@@ -543,7 +545,8 @@ async fn admin_create_user_with_groups() {
                 email: Email::try_from("testuser2@example.com").unwrap(),
                 username: "testuser2".to_string(),
                 password: Password::try_from("Password123").unwrap(),
-                groups: vec!["users".to_string(), "invalid".to_string()],
+                groups: Some(vec!["users".to_string(), "invalid".to_string()]),
+                first_login: false,
             },
             Some(superadmin.user_id),
         )

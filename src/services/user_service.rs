@@ -27,12 +27,18 @@ pub struct UserResponse {
     pub first_login: bool,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateUserRequest {
     pub email: Email,
     pub username: String,
     pub password: Password,
-    pub groups: Vec<String>,
+    pub groups: Option<Vec<String>>,
+    #[serde(default = "default_true")]
+    pub first_login: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -114,7 +120,9 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
             return Err(anyhow!("username taken"));
         }
 
-        let group_ids = self.into_group_ids(&req.groups).await?;
+        let group_ids = self
+            .resolve_group_ids(req.groups.unwrap_or(Vec::new()).clone())
+            .await?;
 
         // Hash password
         let password_hash = self.hash_password(req.password.expose())?;
@@ -124,7 +132,7 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
             email: req.email.to_string(),
             username: req.username,
             password_hash,
-            first_login: false,
+            first_login: req.first_login,
         };
 
         let user = self.user_repo.insert_user(new_user).await?;
@@ -156,7 +164,8 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
                     username: req.username,
                     password: Password::try_from(req.password.as_str())?,
                     // Assign to 'users' group by default
-                    groups: vec!["users".to_string()],
+                    groups: None,
+                    first_login: false,
                 },
                 None,
             )
@@ -365,7 +374,12 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
         self.password_reset_repo.cleanup_expired_tokens().await
     }
 
-    async fn into_group_ids(&self, groups: &Vec<String>) -> Result<Vec<i64>> {
+    async fn resolve_group_ids(&self, mut groups: Vec<String>) -> Result<Vec<i64>> {
+        // check if group is empty, if so assign user to `users` group by default
+        if groups.len() == 0 {
+            groups.push("users".to_string());
+        }
+
         let mut group_ids = Vec::new();
 
         for group in groups {
