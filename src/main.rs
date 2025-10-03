@@ -82,6 +82,8 @@ async fn main() -> anyhow::Result<()> {
             "/change-password",
             get(views::auth::change_password_page).post(views::auth::change_password_post),
         )
+        .route("/api/register", post(api::auth::register_api))
+        .route("/api/login", post(api::auth::login_api))
         .route("/api/refresh-token", post(api::auth::refresh_token_api))
         .route("/api/me", get(api::auth::me_api))
         .route("/api/change-password", post(api::auth::change_password_api))
@@ -89,8 +91,7 @@ async fn main() -> anyhow::Result<()> {
         // assegure-se de aplicar essas Extensions ANTES do middleware nesta sub-árvore:
         .layer(Extension(jwt_service.clone()))
         .layer(Extension(user_service.clone()))
-        .layer(Extension(pool.clone()))
-        .layer(from_fn(require_superadmin));
+        .layer(Extension(pool.clone()));
     let app = Router::new()
         // Pages
         .merge(public_router)
