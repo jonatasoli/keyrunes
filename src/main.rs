@@ -13,11 +13,12 @@ use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
 
 mod api;
+mod domain;
 mod handler;
 mod repository;
 mod services;
 mod views;
-use crate::handler::auth::require_superadmin;
+use crate::handler::auth::{require_auth, require_superadmin};
 
 use repository::sqlx_impl::{PgGroupRepository, PgPasswordResetRepository, PgUserRepository};
 use services::{jwt_service::JwtService, user_service::UserService};
@@ -70,6 +71,8 @@ async fn main() -> anyhow::Result<()> {
             "/register",
             get(views::auth::register_page).post(views::auth::register_post),
         )
+        .route("/api/register", post(api::auth::register_api))
+        .route("/api/login", post(api::auth::login_api))
         .route(
             "/login",
             get(views::auth::login_page).post(views::auth::login_post),
@@ -87,6 +90,12 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/refresh-token", post(api::auth::refresh_token_api))
         .route("/api/me", get(api::auth::me_api))
         .route("/api/change-password", post(api::auth::change_password_api))
+        .route(
+            "/api/admin/user",
+            post(api::admin::create_user)
+                .layer(from_fn(require_superadmin))
+                .layer(from_fn(require_auth)),
+        )
         // se seu middleware precisa de Extensions (jwt_service, pool, user_service),
         // assegure-se de aplicar essas Extensions ANTES do middleware nesta sub-árvore:
         .layer(Extension(jwt_service.clone()))
@@ -108,7 +117,9 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("  • Health: /api/health, /api/health/ready, /api/health/live");
     tracing::info!("  • Public: /login, /register, /reset-password");
     tracing::info!("  • Protected: /dashboard, /change-password");
-    tracing::info!("  • API: /api/login, /api/register, /api/me, /api/refresh-token");
+    tracing::info!(
+        "  • API: /api/login, /api/register, /api/me, /api/refresh-token, /api/admin/user"
+    );
 
     axum::serve(listener, app).await.unwrap();
 

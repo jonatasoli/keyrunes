@@ -153,6 +153,19 @@ pub trait GroupRepository: Send + Sync + 'static {
         group_id: i64,
         assigned_by: Option<i64>,
     ) -> Result<()>;
+    async fn assign_user_to_groups(
+        &self,
+        user_id: i64,
+        group_ids: &[i64],
+        assigned_by: Option<i64>,
+    ) -> Result<()> {
+        for group_id in group_ids {
+            let _ = self
+                .assign_user_to_group(user_id, *group_id, assigned_by)
+                .await?;
+        }
+        Ok(())
+    }
     async fn remove_user_from_group(&self, user_id: i64, group_id: i64) -> Result<()>;
     async fn get_group_policies(&self, group_id: i64) -> Result<Vec<Policy>>;
 }

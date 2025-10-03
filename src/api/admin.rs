@@ -13,7 +13,7 @@ use crate::repository::sqlx_impl::{
 use crate::services::{
     group_service::{CreateGroupRequest, GroupService},
     policy_service::{CreatePolicyRequest, PolicyService},
-    user_service::UserService,
+    user_service::{CreateUserRequest, UserService},
 };
 
 use crate::handler::auth::AuthenticatedUser;
@@ -35,6 +35,18 @@ pub struct AdminInfo {
     pub username: String,
     pub email: String,
     pub groups: Vec<String>,
+}
+
+// POST /api/admin/user
+pub async fn create_user(
+    Extension(user_service): Extension<Arc<UserServiceType>>,
+    Extension(admin): Extension<AuthenticatedUser>,
+    Json(payload): Json<CreateUserRequest>,
+) -> impl IntoResponse {
+    match user_service.create_user(payload, Some(admin.user_id)).await {
+        Ok(user) => (StatusCode::CREATED, Json(user)).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+    }
 }
 
 // GET /api/admin/dashboard
