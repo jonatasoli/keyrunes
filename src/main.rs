@@ -85,8 +85,6 @@ async fn main() -> anyhow::Result<()> {
             "/change-password",
             get(views::auth::change_password_page).post(views::auth::change_password_post),
         )
-        .route("/api/register", post(api::auth::register_api))
-        .route("/api/login", post(api::auth::login_api))
         .route("/api/refresh-token", post(api::auth::refresh_token_api))
         .route("/api/me", get(api::auth::me_api))
         .route("/api/change-password", post(api::auth::change_password_api))
