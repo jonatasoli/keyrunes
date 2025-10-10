@@ -68,12 +68,16 @@ Follow these steps to get KeyRunes running locally:
 Start the database and services using Docker Compose:
 
 Create a file named `.env` This allows docker compose to pick up env vars instead of manually passing them in the cli command everytime.
-Setup your env variables with values using .env-example` file listed in the main directory as an example.
+Setup your env variables with values using `.env-example` file listed in the main directory as an example.
 
 Run the below to create db tables / migrations
 ```bash
    sqlx migrate run 
 ```
+
+make sure to add the `DATABASE_URL` env var to your `.env` when running the above command. Take note,
+you can ran the app directly and face no issue, but an sql migration issue can come up because the `sqlx` command looks for the 
+database url env var
 
 Run the below
 ```bash
