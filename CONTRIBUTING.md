@@ -61,31 +61,39 @@ Feature requests are discussed openly and may be implemented collaboratively.
 Follow these steps to get KeyRunes running locally:
 
 1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/jonatasoli/keyrunes.git
-   cd keyrunes
+```bash
+   git clone https://github.com/jonatasoli/keyrunes.git && cd keyrunes
+```
 
 Start the database and services using Docker Compose:
 
+Create a file named `.env` This allows docker compose to pick up env vars instead of manually passing them in the cli command everytime.
+Setup your env variables with values using .env-example` file listed in the main directory as an example.
+
+Run the below to create db tables / migrations
 ```bash
-docker-compose up
+   sqlx migrate run 
+```
+
+Run the below
+```bash
+   docker-compose up
 ```
 
 Run the web application:
 
 ```bash
-cargo run --bin keyrunes
-
+   cargo run --bin keyrunes
 ```
 
 Run the CLI application:
 ```bash
-cargo run --bin cli
+   cargo run --bin cli
 ```
 
 Run tests:
 ```bash
-cargo test
+  cargo test 
 ```
 
 Code Style and Standards
@@ -101,7 +109,7 @@ Keep code modular and well-documented.
 Use Clippy to catch warnings:
 
 ```bash
-cargo clippy
+  cargo clippy
 ```
 
 Submitting Pull Requests
@@ -128,4 +136,3 @@ Community Guidelines
 - Stay on-topic and avoid off-topic discussions in issues/PRs.
 
 - Follow the [Code of Conduct](CODE_OF_CONDUCT.md)
-
