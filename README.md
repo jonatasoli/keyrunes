@@ -68,7 +68,26 @@
 
 ## 🧪 Quickstart (WIP)
 
-> ⚠️ The implementation is still in progress. A `quickstart` guide will be available once the core engine is ready.
+Follow these steps to quickly start KeyRunes locally:
+
+```bash
+# 1. Copy environment variables
+cp .env-example .env
+
+# 2. Start the database using Docker
+docker-compose up -d
+
+# 3. Run the web application
+cargo run --bin keyrunes
+
+# 4. Or run the CLI application
+cargo run --bin cli
+
+# 5. Run tests 
+cargo test
+
+# 6. Stop the database container when done
+docker-compose down
 
 ---
 
