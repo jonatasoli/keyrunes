@@ -88,7 +88,7 @@ cargo test
 
 # 6. Stop the database container when done
 docker-compose down
-
+```
 ---
 
 ## 📂 Project Structure (Planned)
