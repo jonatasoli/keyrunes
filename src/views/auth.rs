@@ -1,3 +1,4 @@
+use axum::http::header::SET_COOKIE;
 use axum::{
     extract::{Extension, Form, Query},
     http::{HeaderMap, StatusCode},
@@ -111,13 +112,17 @@ pub async fn login_post(
                 return (StatusCode::OK, Html(body)).into_response();
             }
 
-            // Normal login, redirect to dashboard
+            // Normal login, redirect to dashboard - template is being rendered not redirected
             let mut ctx = Context::new();
             ctx.insert("title", "Dashboard");
             ctx.insert("user", &auth_response.user);
             ctx.insert("token", &auth_response.token);
-            let body = tmpl.render("dashboard.html", &ctx).unwrap();
-            (StatusCode::OK, Html(body)).into_response()
+
+            let mut headers = HeaderMap::new();
+
+            headers.insert(SET_COOKIE, auth_response.token.parse().unwrap());
+
+            (headers, Redirect::to("/dashboard")).into_response()
         }
         Err(e) => {
             let mut ctx = Context::new();
@@ -255,12 +260,9 @@ fn extract_bearer_token_from_cookie_or_header(headers: &HeaderMap) -> Option<Str
     // Then try to get from cookies
     if let Some(cookie_header) = headers.get("cookie") {
         if let Ok(cookie_str) = cookie_header.to_str() {
-            for cookie in cookie_str.split(';') {
-                let cookie = cookie.trim();
-                if cookie.starts_with("jwt_token=") {
-                    return Some(cookie[10..].to_string());
-                }
-            }
+            let cookies = cookie_str.split("; ").collect::<Vec<&str>>();
+            let jwt_token = cookies[1].trim().to_string();
+            return Some(jwt_token);
         }
     }
 
