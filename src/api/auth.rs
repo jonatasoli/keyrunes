@@ -201,8 +201,9 @@ pub async fn reset_password_page(
 
     match tmpl.render("reset_password.html", &ctx) {
         Ok(body) => (StatusCode::OK, axum::response::Html(body)).into_response(),
-        Err(e) => ErrorResponse::internal_server_error(format!("Template error: {}", e))
-            .into_response(),
+        Err(e) => {
+            ErrorResponse::internal_server_error(format!("Template error: {}", e)).into_response()
+        }
     }
 }
 

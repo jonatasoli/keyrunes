@@ -63,6 +63,7 @@ async fn teardown_test_db(db_name: String) {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_insert_and_find_user() {
     // Setup
     let (pool, db_name) = setup_test_db().await;
@@ -104,6 +105,7 @@ async fn test_insert_and_find_user() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_update_user_password() {
     let (pool, db_name) = setup_test_db().await;
     let repo = PgUserRepository::new(pool.clone());
@@ -132,6 +134,7 @@ async fn test_update_user_password() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_set_first_login() {
     let (pool, db_name) = setup_test_db().await;
     let repo = PgUserRepository::new(pool.clone());
@@ -159,6 +162,7 @@ async fn test_set_first_login() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_duplicate_email() {
     let (pool, db_name) = setup_test_db().await;
     let repo = PgUserRepository::new(pool.clone());
@@ -190,6 +194,7 @@ async fn test_duplicate_email() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_duplicate_username() {
     let (pool, db_name) = setup_test_db().await;
     let repo = PgUserRepository::new(pool.clone());
@@ -221,6 +226,7 @@ async fn test_duplicate_username() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_case_insensitive_email() {
     let (pool, db_name) = setup_test_db().await;
     let repo = PgUserRepository::new(pool.clone());

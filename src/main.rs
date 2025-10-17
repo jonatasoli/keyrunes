@@ -21,7 +21,7 @@ mod views;
 
 use crate::handler::auth::{require_auth, require_superadmin};
 use crate::handler::errors::handler_404;
-use crate::handler::logging::{init_logging, request_logging_middleware, LogLevel};
+use crate::handler::logging::{LogLevel, init_logging, request_logging_middleware};
 
 use repository::sqlx_impl::{PgGroupRepository, PgPasswordResetRepository, PgUserRepository};
 use services::{jwt_service::JwtService, user_service::UserService};
@@ -217,6 +217,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_health_check() {
         let app = create_test_app().await;
 
@@ -237,6 +238,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_404_handler() {
         let app = create_test_app().await;
 

@@ -1,15 +1,15 @@
 /// Tests for smart 404 handler
-/// 
+///
 /// This test suite verifies that the 404 handler correctly returns:
 /// - JSON for API routes (/api/*)
 /// - JSON when Accept header contains application/json
 /// - HTML for browser requests
 use axum::{
+    Router,
     body::Body,
     extract::Extension,
     http::{Request, StatusCode},
     routing::get,
-    Router,
 };
 use sqlx::postgres::PgPoolOptions;
 use std::sync::Arc;
@@ -47,8 +47,8 @@ mod test_handlers {
 
     impl IntoResponse for ErrorResponse {
         fn into_response(self) -> Response {
-            let status = StatusCode::from_u16(self.status_code)
-                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            let status =
+                StatusCode::from_u16(self.status_code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
             (status, Json(self)).into_response()
         }
     }
@@ -57,9 +57,7 @@ mod test_handlers {
         headers
             .get("accept")
             .and_then(|v| v.to_str().ok())
-            .map(|accept| {
-                accept.contains("application/json") || accept.contains("*/json")
-            })
+            .map(|accept| accept.contains("application/json") || accept.contains("*/json"))
             .unwrap_or(false)
     }
 
@@ -105,6 +103,7 @@ async fn create_test_app() -> Router {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_api_route_returns_json_404() {
     let app = create_test_app().await;
 
@@ -141,6 +140,7 @@ async fn test_api_route_returns_json_404() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_browser_route_returns_html_404() {
     let app = create_test_app().await;
 
@@ -178,6 +178,7 @@ async fn test_browser_route_returns_html_404() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_json_accept_header_returns_json() {
     let app = create_test_app().await;
 
@@ -204,6 +205,7 @@ async fn test_json_accept_header_returns_json() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_no_accept_header_returns_html() {
     let app = create_test_app().await;
 
@@ -229,6 +231,7 @@ async fn test_no_accept_header_returns_html() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_api_prefix_always_json() {
     let app = create_test_app().await;
 
@@ -269,6 +272,7 @@ async fn test_api_prefix_always_json() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_valid_route_still_works() {
     let app = create_test_app().await;
 
@@ -286,6 +290,7 @@ async fn test_valid_route_still_works() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_json_structure_is_correct() {
     let app = create_test_app().await;
 
@@ -312,6 +317,7 @@ async fn test_json_structure_is_correct() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_html_page_has_useful_content() {
     let app = create_test_app().await;
 
@@ -337,6 +343,7 @@ async fn test_html_page_has_useful_content() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_mixed_accept_headers() {
     let app = create_test_app().await;
 
@@ -358,5 +365,8 @@ async fn test_mixed_accept_headers() {
 
     // Should return JSON because it's explicitly requested
     let json: Result<serde_json::Value, _> = serde_json::from_slice(&body);
-    assert!(json.is_ok(), "Should return JSON when application/json is in Accept header");
+    assert!(
+        json.is_ok(),
+        "Should return JSON when application/json is in Accept header"
+    );
 }

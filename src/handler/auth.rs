@@ -76,8 +76,11 @@ pub async fn optional_auth(
 pub fn require_groups(
     required_groups: Vec<String>,
 ) -> impl Clone
-       + Fn(Extension<AuthenticatedUser>, Request<Body>, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
-{
++ Fn(
+    Extension<AuthenticatedUser>,
+    Request<Body>,
+    Next,
+) -> Pin<Box<dyn Future<Output = Response> + Send>> {
     let required_groups: Vec<Arc<String>> = required_groups.into_iter().map(Arc::new).collect();
 
     move |Extension(user): Extension<AuthenticatedUser>, request: Request<Body>, next: Next| {
@@ -112,7 +115,7 @@ pub async fn require_superadmin(
 }
 
 /// Extract Bearer token from Authorization header or cookies
-/// 
+///
 /// FIXED: Safe cookie parsing using strip_prefix instead of direct indexing
 fn extract_bearer_token(headers: &HeaderMap) -> Option<String> {
     // First try Authorization header
@@ -129,7 +132,7 @@ fn extract_bearer_token(headers: &HeaderMap) -> Option<String> {
         if let Ok(cookie_str) = cookie_header.to_str() {
             for cookie in cookie_str.split(';') {
                 let cookie = cookie.trim();
-                
+
                 // Use strip_prefix instead of direct indexing
                 if let Some(token_value) = cookie.strip_prefix("jwt_token=") {
                     // Only return if there's actually a value

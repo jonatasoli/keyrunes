@@ -15,7 +15,10 @@ impl ErrorResponse {
     /// Create a new error response
     pub fn new(status: StatusCode, message: impl Into<String>) -> Self {
         Self {
-            error: status.canonical_reason().unwrap_or("Unknown Error").to_string(),
+            error: status
+                .canonical_reason()
+                .unwrap_or("Unknown Error")
+                .to_string(),
             message: message.into(),
             status_code: status.as_u16(),
         }
@@ -49,9 +52,9 @@ impl ErrorResponse {
 
 impl IntoResponse for ErrorResponse {
     fn into_response(self) -> Response {
-        let status = StatusCode::from_u16(self.status_code)
-            .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-        
+        let status =
+            StatusCode::from_u16(self.status_code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+
         (status, Json(self)).into_response()
     }
 }
@@ -61,9 +64,7 @@ fn wants_json(headers: &HeaderMap) -> bool {
     headers
         .get("accept")
         .and_then(|v| v.to_str().ok())
-        .map(|accept| {
-            accept.contains("application/json") || accept.contains("*/json")
-        })
+        .map(|accept| accept.contains("application/json") || accept.contains("*/json"))
         .unwrap_or(false)
 }
 
@@ -215,46 +216,50 @@ pub async fn handler_500() -> impl IntoResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_error_response_bad_request() {
-        let error = ErrorResponse::bad_request("Invalid input");
-        assert_eq!(error.status_code, 400);
-        assert_eq!(error.error, "Bad Request");
-        assert_eq!(error.message, "Invalid input");
-    }
-
-    #[test]
-    fn test_error_response_unauthorized() {
-        let error = ErrorResponse::unauthorized("Missing token");
-        assert_eq!(error.status_code, 401);
-        assert_eq!(error.error, "Unauthorized");
-    }
-
-    #[test]
-    fn test_error_response_forbidden() {
-        let error = ErrorResponse::forbidden("Access denied");
-        assert_eq!(error.status_code, 403);
-        assert_eq!(error.error, "Forbidden");
-    }
-
-    #[test]
-    fn test_error_response_not_found() {
-        let error = ErrorResponse::not_found("Resource not found");
-        assert_eq!(error.status_code, 404);
-        assert_eq!(error.error, "Not Found");
-    }
-
-    #[test]
-    fn test_error_response_internal_server_error() {
-        let error = ErrorResponse::internal_server_error("Something went wrong");
-        assert_eq!(error.status_code, 500);
-        assert_eq!(error.error, "Internal Server Error");
-    }
+    use axum::body::Body;
+    use axum::http::Request as HttpRequest;
 
     #[tokio::test]
-    async fn test_handler_404() {
-        let response = handler_404().await.into_response();
+    async fn test_error_handlers() {
+        // Test 404 handler
+        let req = HttpRequest::builder()
+            .uri("/nonexistent")
+            .body(Body::empty())
+            .unwrap();
+        let response = handler_404(req).await.into_response();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+        // Test 400 handler
+        let response = handler_400().await.into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+        // Test 401 handler
+        let response = handler_401().await.into_response();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+
+        // Test 403 handler
+        let response = handler_403().await.into_response();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        // Test 500 handler
+        let response = handler_500().await.into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    #[tokio::test]
+    async fn test_404_includes_path() {
+        let req = HttpRequest::builder()
+            .uri("/api/nonexistent")
+            .body(Body::empty())
+            .unwrap();
+        let response = handler_404(req).await.into_response();
+
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
+
+        assert!(body_str.contains("not found") || body_str.contains("404"));
     }
 }

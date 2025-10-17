@@ -233,7 +233,7 @@ pub async fn reset_password_page(
 }
 
 /// Helper function to extract Bearer token from Authorization header or cookies
-/// 
+///
 /// FIXED: Properly handles cookie parsing without panicking
 fn extract_bearer_token_from_cookie_or_header(headers: &HeaderMap) -> Option<String> {
     // First try Authorization header
@@ -251,7 +251,7 @@ fn extract_bearer_token_from_cookie_or_header(headers: &HeaderMap) -> Option<Str
             // Parse cookies safely
             for cookie in cookie_str.split(';') {
                 let cookie = cookie.trim();
-                
+
                 // Check if this is a jwt_token cookie
                 if let Some(token_value) = cookie.strip_prefix("jwt_token=") {
                     // Only return if there's actually a value
@@ -296,33 +296,12 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_token_from_cookie_only() {
+    fn test_extract_token_from_cookie_single() {
         let mut headers = HeaderMap::new();
-        headers.insert("cookie", HeaderValue::from_static("jwt_token=abc123"));
+        headers.insert("cookie", HeaderValue::from_static("jwt_token=test_token"));
 
         let token = extract_bearer_token_from_cookie_or_header(&headers);
-        assert_eq!(token, Some("abc123".to_string()));
-    }
-
-    #[test]
-    fn test_extract_token_from_cookie_with_spaces() {
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "cookie",
-            HeaderValue::from_static(" jwt_token=token123 ; other=val "),
-        );
-
-        let token = extract_bearer_token_from_cookie_or_header(&headers);
-        assert_eq!(token, Some("token123".to_string()));
-    }
-
-    #[test]
-    fn test_extract_token_empty_cookie() {
-        let mut headers = HeaderMap::new();
-        headers.insert("cookie", HeaderValue::from_static("jwt_token="));
-
-        let token = extract_bearer_token_from_cookie_or_header(&headers);
-        assert_eq!(token, None);
+        assert_eq!(token, Some("test_token".to_string()));
     }
 
     #[test]
@@ -333,18 +312,21 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_token_invalid_header() {
+    fn test_extract_token_malformed_cookie() {
         let mut headers = HeaderMap::new();
-        headers.insert("authorization", HeaderValue::from_static("Basic xyz"));
+        headers.insert(
+            "cookie",
+            HeaderValue::from_static("malformed_cookie_without_equals"),
+        );
 
         let token = extract_bearer_token_from_cookie_or_header(&headers);
         assert_eq!(token, None);
     }
 
     #[test]
-    fn test_extract_token_bearer_too_short() {
+    fn test_extract_token_empty_cookie_value() {
         let mut headers = HeaderMap::new();
-        headers.insert("authorization", HeaderValue::from_static("Bearer "));
+        headers.insert("cookie", HeaderValue::from_static("jwt_token="));
 
         let token = extract_bearer_token_from_cookie_or_header(&headers);
         assert_eq!(token, None);

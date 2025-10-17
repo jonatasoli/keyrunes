@@ -89,6 +89,8 @@ impl JwtService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
+    use std::time::Duration;
 
     #[test]
     fn test_jwt_token_generation_and_verification() {
@@ -113,8 +115,13 @@ mod tests {
         let groups = vec!["users".to_string()];
 
         let original_token = service
-            .generate_token(1, "test@example.com", "testuser", groups)
+            .generate_token(1, "test@example.com", "testuser", groups.clone())
             .unwrap();
+
+        use std::thread;
+        use std::time::Duration;
+        thread::sleep(Duration::from_secs(1));
+
         let refreshed_token = service.refresh_token(&original_token).unwrap();
 
         let original_claims = service.verify_token(&original_token).unwrap();
