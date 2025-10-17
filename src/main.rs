@@ -19,6 +19,7 @@ mod repository;
 mod services;
 mod views;
 use crate::handler::auth::{require_auth, require_superadmin};
+use crate::handler::logging::{init_logging, request_logging_middleware, LogLevel};
 
 use repository::sqlx_impl::{PgGroupRepository, PgPasswordResetRepository, PgUserRepository};
 use services::{jwt_service::JwtService, user_service::UserService};
@@ -27,13 +28,30 @@ use services::{jwt_service::JwtService, user_service::UserService};
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
-    // Initialize tracing
-    tracing_subscriber::fmt::init();
+    // Logging
+    let log_level = std::env::var("LOG_LEVEL")
+        .ok()
+        .and_then(|level| match level.to_lowercase().as_str() {
+            "info" => Some(LogLevel::Info),
+            "debug" => Some(LogLevel::Debug),
+            "error" => Some(LogLevel::Error),
+            "critical" => Some(LogLevel::Critical),
+            _ => None,
+        })
+        .unwrap_or(LogLevel::Info); // Default para Info
+
+    // Init tracing
+    init_logging(log_level);
+
+    tracing::info!("🚀 Starting Keyrunes...");
+    tracing::info!("📊 Log level configurated: {:?}", log_level);
+
 
     // Initialize health check
     api::health::init_health_check();
 
     // Database
+    tracing::info!("🔗 Starting database...");
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:password@localhost:5432/postgres".into());
 
@@ -41,6 +59,7 @@ async fn main() -> anyhow::Result<()> {
         .max_connections(5)
         .connect(&database_url)
         .await?;
+    tracing::info!("✅ Database established!");
 
     // Initialize repositories
     let user_repo = Arc::new(PgUserRepository::new(pool.clone()));
@@ -48,8 +67,12 @@ async fn main() -> anyhow::Result<()> {
     let password_reset_repo = Arc::new(PgPasswordResetRepository::new(pool.clone()));
 
     // Initialize JWT service
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "your-super-secret-jwt-key-change-in-production".into());
+    let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| {
+        tracing::warn!(
+            "⚠️  JWT_SECRET not seted, starting deafault token (DON'T USE IN PRODUCTION)"
+        );
+        "your-super-secret-jwt-key-change-in-production".into()
+    });
     let jwt_service = Arc::new(JwtService::new(&jwt_secret));
 
     // Initialize user service
@@ -60,7 +83,9 @@ async fn main() -> anyhow::Result<()> {
         jwt_service.clone(),
     ));
 
+    tracing::info!("📄 Loading templates...");
     let tera = Tera::new("templates/**/*").expect("Error to load templates");
+    tracing::info!("✅ Templates loaded with success");
 
     let public_router = Router::new()
         .route("/", get(|| async { Redirect::temporary("/login") }))
@@ -165,6 +190,30 @@ mod tests {
             .layer(Extension(user_service))
             .layer(Extension(jwt_service))
             .layer(Extension(pool))
+    }
+
+    #[test]
+    fn test_log_level_parsing() {
+        // Testing log level parsing
+        let test_cases = vec![
+            ("info", Some(LogLevel::Info)),
+            ("INFO", Some(LogLevel::Info)),
+            ("debug", Some(LogLevel::Debug)),
+            ("error", Some(LogLevel::Error)),
+            ("critical", Some(LogLevel::Critical)),
+            ("invalid", None),
+        ];
+
+        for (input, expected) in test_cases {
+            let result = match input.to_lowercase().as_str() {
+                "info" => Some(LogLevel::Info),
+                "debug" => Some(LogLevel::Debug),
+                "error" => Some(LogLevel::Error),
+                "critical" => Some(LogLevel::Critical),
+                _ => None,
+            };
+            assert_eq!(result, expected, "Failed for input: {}", input);
+        }
     }
 
     #[tokio::test]

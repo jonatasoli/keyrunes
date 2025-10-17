@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card" style="text-align: center; padding: 3rem;">
+  <h1 style="font-size: 4rem; color: #e74c3c; margin: 0;">400</h1>
+  <h2 style="color: #555; margin: 1rem 0;">Bad Request</h2>
+  
+  <p style="color: #666; max-width: 500px; margin: 1.5rem auto;">
+    The request could not be processed. Please check your data and try again.
+  </p>
+
+  {% if error_message %}
+  <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 1rem; margin: 1.5rem auto; max-width: 500px;">
+    <strong>Details:</strong> {{ error_message }}
+  </div>
+  {% endif %}
+
+  <div style="margin-top: 2rem;">
+    <a href="javascript:history.back()" style="margin-right: 1rem;">← Go Back</a>
+    <a href="/" style="text-decoration: underline;">Go to Home</a>
+  </div>
+</section>
+{% endblock %}
