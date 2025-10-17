@@ -1,11 +1,15 @@
 use axum::{
+    body::Body,
     extract::{Extension, Request},
-    http::{HeaderMap, StatusCode},
+    http::HeaderMap,
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
+use crate::handler::errors::ErrorResponse;
 use crate::services::jwt_service::{Claims, JwtService};
 
 #[derive(Clone)]
@@ -37,7 +41,7 @@ pub async fn require_auth(
     let token = match extract_bearer_token(&headers) {
         Some(token) => token,
         None => {
-            return (StatusCode::UNAUTHORIZED, "Missing authorization header").into_response();
+            return ErrorResponse::unauthorized("Missing authorization header").into_response();
         }
     };
 
@@ -47,7 +51,7 @@ pub async fn require_auth(
             request.extensions_mut().insert(user);
             next.run(request).await
         }
-        Err(_) => (StatusCode::UNAUTHORIZED, "Invalid token").into_response(),
+        Err(_) => ErrorResponse::unauthorized("Invalid or expired token").into_response(),
     }
 }
 
@@ -68,55 +72,70 @@ pub async fn optional_auth(
     next.run(request).await
 }
 
+/// Middleware that requires specific groups
+pub fn require_groups(
+    required_groups: Vec<String>,
+) -> impl Clone
+       + Fn(Extension<AuthenticatedUser>, Request<Body>, Next) -> Pin<Box<dyn Future<Output = Response> + Send>>
+{
+    let required_groups: Vec<Arc<String>> = required_groups.into_iter().map(Arc::new).collect();
+
+    move |Extension(user): Extension<AuthenticatedUser>, request: Request<Body>, next: Next| {
+        let required_groups = required_groups.clone();
+
+        Box::pin(async move {
+            let has_required_group = required_groups
+                .iter()
+                .any(|group| user.groups.iter().any(|ug| ug == &**group));
+
+            if has_required_group {
+                next.run(request).await
+            } else {
+                ErrorResponse::forbidden("Insufficient permissions - required group not found")
+                    .into_response()
+            }
+        })
+    }
+}
+
 /// Middleware that requires superadmin group
-/// NOTE: This should be used AFTER require_auth middleware
-pub async fn require_superadmin(request: Request, next: Next) -> Response {
-    // Check if user is authenticated
-    if let Some(user) = request.extensions().get::<AuthenticatedUser>() {
-        if user.groups.contains(&"superadmin".to_string()) {
-            return next.run(request).await;
-        }
-        return (StatusCode::FORBIDDEN, "Superadmin access required").into_response();
+pub async fn require_superadmin(
+    Extension(user): Extension<AuthenticatedUser>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if user.groups.contains(&"superadmin".to_string()) {
+        next.run(request).await
+    } else {
+        ErrorResponse::forbidden("Superadmin access required").into_response()
     }
-
-    (StatusCode::UNAUTHORIZED, "Authentication required").into_response()
 }
 
-/// Check if user has specific group
-/// NOTE: This should be used AFTER require_auth middleware
-pub async fn require_group(group_name: &str, request: Request, next: Next) -> Response {
-    // Check if user is authenticated
-    if let Some(user) = request.extensions().get::<AuthenticatedUser>() {
-        if user.groups.contains(&group_name.to_string()) {
-            return next.run(request).await;
-        }
-        return (
-            StatusCode::FORBIDDEN,
-            format!("Group '{}' membership required", group_name),
-        )
-            .into_response();
-    }
-
-    (StatusCode::UNAUTHORIZED, "Authentication required").into_response()
-}
-
+/// Extract Bearer token from Authorization header or cookies
+/// 
+/// FIXED: Safe cookie parsing using strip_prefix instead of direct indexing
 fn extract_bearer_token(headers: &HeaderMap) -> Option<String> {
     // First try Authorization header
     if let Some(auth_header) = headers.get("authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
-            if auth_str.starts_with("Bearer ") {
+            if auth_str.starts_with("Bearer ") && auth_str.len() > 7 {
                 return Some(auth_str[7..].to_string());
             }
         }
     }
 
-    // Then try cookies
+    // Then try cookies - SAFE PARSING
     if let Some(cookie_header) = headers.get("cookie") {
         if let Ok(cookie_str) = cookie_header.to_str() {
             for cookie in cookie_str.split(';') {
                 let cookie = cookie.trim();
-                if cookie.starts_with("jwt_token=") {
-                    return Some(cookie[10..].to_string());
+                
+                // Use strip_prefix instead of direct indexing
+                if let Some(token_value) = cookie.strip_prefix("jwt_token=") {
+                    // Only return if there's actually a value
+                    if !token_value.is_empty() {
+                        return Some(token_value.to_string());
+                    }
                 }
             }
         }
@@ -149,6 +168,49 @@ mod tests {
 
         let token = extract_bearer_token(&headers);
         assert_eq!(token, Some("test123".to_string()));
+    }
+
+    #[test]
+    fn test_extract_bearer_token_from_cookie_only() {
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", HeaderValue::from_static("jwt_token=abc123"));
+
+        let token = extract_bearer_token(&headers);
+        assert_eq!(token, Some("abc123".to_string()));
+    }
+
+    #[test]
+    fn test_extract_bearer_token_empty_cookie() {
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", HeaderValue::from_static("jwt_token="));
+
+        let token = extract_bearer_token(&headers);
+        assert_eq!(token, None);
+    }
+
+    #[test]
+    fn test_extract_bearer_token_missing() {
+        let headers = HeaderMap::new();
+        let token = extract_bearer_token(&headers);
+        assert_eq!(token, None);
+    }
+
+    #[test]
+    fn test_extract_bearer_token_invalid_format() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", HeaderValue::from_static("Basic abc123"));
+
+        let token = extract_bearer_token(&headers);
+        assert_eq!(token, None);
+    }
+
+    #[test]
+    fn test_extract_bearer_token_bearer_too_short() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", HeaderValue::from_static("Bearer "));
+
+        let token = extract_bearer_token(&headers);
+        assert_eq!(token, None);
     }
 
     #[test]

@@ -6,6 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::handler::errors::ErrorResponse;
 use crate::repository::sqlx_impl::{
     PgGroupRepository, PgPasswordResetRepository, PgUserRepository,
 };
@@ -66,7 +67,7 @@ pub struct MessageResponse {
 
 type UserServiceType = UserService<PgUserRepository, PgGroupRepository, PgPasswordResetRepository>;
 
-// POST /api/register
+/// POST /api/register
 pub async fn register_api(
     Extension(service): Extension<Arc<UserServiceType>>,
     Json(payload): Json<RegisterApi>,
@@ -80,22 +81,22 @@ pub async fn register_api(
 
     match service.register(req).await {
         Ok(auth_response) => (StatusCode::CREATED, Json(auth_response)).into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => ErrorResponse::bad_request(e.to_string()).into_response(),
     }
 }
 
-// POST /api/login
+/// POST /api/login
 pub async fn login_api(
     Extension(service): Extension<Arc<UserServiceType>>,
     Json(payload): Json<LoginApi>,
 ) -> impl IntoResponse {
     match service.login(payload.identity, payload.password).await {
         Ok(auth_response) => (StatusCode::OK, Json(auth_response)).into_response(),
-        Err(e) => (StatusCode::UNAUTHORIZED, e.to_string()).into_response(),
+        Err(e) => ErrorResponse::unauthorized(e.to_string()).into_response(),
     }
 }
 
-// POST /api/refresh-token
+/// POST /api/refresh-token
 pub async fn refresh_token_api(
     Extension(service): Extension<Arc<UserServiceType>>,
     Json(payload): Json<RefreshTokenRequest>,
@@ -106,11 +107,11 @@ pub async fn refresh_token_api(
             Json(RefreshTokenResponse { token: new_token }),
         )
             .into_response(),
-        Err(e) => (StatusCode::UNAUTHORIZED, e.to_string()).into_response(),
+        Err(e) => ErrorResponse::unauthorized(e.to_string()).into_response(),
     }
 }
 
-// GET /api/me - Get current user info from JWT token
+/// GET /api/me - Get current user info from JWT token
 pub async fn me_api(
     Extension(service): Extension<Arc<UserServiceType>>,
     headers: HeaderMap,
@@ -118,21 +119,17 @@ pub async fn me_api(
     let token = match extract_bearer_token(&headers) {
         Some(token) => token,
         None => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                "Missing or invalid authorization header".to_string(),
-            )
-                .into_response();
+            return ErrorResponse::unauthorized("Missing authorization header").into_response();
         }
     };
 
     match service.get_user_by_token(&token).await {
         Ok(user) => (StatusCode::OK, Json(user)).into_response(),
-        Err(e) => (StatusCode::UNAUTHORIZED, e.to_string()).into_response(),
+        Err(e) => ErrorResponse::unauthorized(e.to_string()).into_response(),
     }
 }
 
-// POST /api/change-password
+/// POST /api/change-password
 pub async fn change_password_api(
     Extension(service): Extension<Arc<UserServiceType>>,
     headers: HeaderMap,
@@ -141,17 +138,13 @@ pub async fn change_password_api(
     let token = match extract_bearer_token(&headers) {
         Some(token) => token,
         None => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                "Missing or invalid authorization header".to_string(),
-            )
-                .into_response();
+            return ErrorResponse::unauthorized("Missing authorization header").into_response();
         }
     };
 
     let user_id = match service.jwt_service.extract_user_id(&token) {
         Ok(id) => id,
-        Err(e) => return (StatusCode::UNAUTHORIZED, e.to_string()).into_response(),
+        Err(e) => return ErrorResponse::unauthorized(e.to_string()).into_response(),
     };
 
     match service.change_password(user_id, payload).await {
@@ -162,11 +155,11 @@ pub async fn change_password_api(
             }),
         )
             .into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => ErrorResponse::bad_request(e.to_string()).into_response(),
     }
 }
 
-// POST /api/forgot-password
+/// POST /api/forgot-password
 pub async fn forgot_password_api(
     Extension(service): Extension<Arc<UserServiceType>>,
     Json(payload): Json<ForgotPasswordApi>,
@@ -193,11 +186,11 @@ pub async fn forgot_password_api(
             )
                 .into_response()
         }
-        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => ErrorResponse::bad_request(e.to_string()).into_response(),
     }
 }
 
-// GET /reset-password?forgot_password=TOKEN - Display reset password form
+/// GET /reset-password?forgot_password=TOKEN - Display reset password form
 pub async fn reset_password_page(
     Extension(tmpl): Extension<tera::Tera>,
     Query(params): Query<ResetPasswordQuery>,
@@ -208,15 +201,12 @@ pub async fn reset_password_page(
 
     match tmpl.render("reset_password.html", &ctx) {
         Ok(body) => (StatusCode::OK, axum::response::Html(body)).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Template error: {}", e),
-        )
+        Err(e) => ErrorResponse::internal_server_error(format!("Template error: {}", e))
             .into_response(),
     }
 }
 
-// POST /api/reset-password
+/// POST /api/reset-password
 pub async fn reset_password_api(
     Extension(service): Extension<Arc<UserServiceType>>,
     Json(payload): Json<ResetPasswordApi>,
@@ -234,11 +224,11 @@ pub async fn reset_password_api(
             }),
         )
             .into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => ErrorResponse::bad_request(e.to_string()).into_response(),
     }
 }
 
-// Helper function to extract Bearer token from Authorization header
+/// Helper function to extract Bearer token from Authorization header
 fn extract_bearer_token(headers: &HeaderMap) -> Option<String> {
     let auth_header = headers.get("authorization")?;
     let auth_str = auth_header.to_str().ok()?;
@@ -278,5 +268,17 @@ mod tests {
 
         let token = extract_bearer_token(&headers);
         assert_eq!(token, None);
+    }
+
+    #[test]
+    fn test_register_api_payload() {
+        let payload = RegisterApi {
+            email: "test@example.com".to_string(),
+            username: "testuser".to_string(),
+            password: "password123".to_string(),
+        };
+
+        assert_eq!(payload.email, "test@example.com");
+        assert_eq!(payload.username, "testuser");
     }
 }

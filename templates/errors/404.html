@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card" style="text-align: center; padding: 3rem;">
+  <h1 style="font-size: 4rem; color: #3498db; margin: 0;">404</h1>
+  <h2 style="color: #555; margin: 1rem 0;">Page Not Found</h2>
+  
+  <p style="color: #666; max-width: 500px; margin: 1.5rem auto;">
+    The page you are looking for does not exist or has been moved. This can happen when a link is broken or the address was typed incorrectly.
+  </p>
+
+  {% if path %}
+  <div style="background: #e8f4f8; border: 1px solid #3498db; border-radius: 4px; padding: 1rem; margin: 1.5rem auto; max-width: 500px;">
+    <strong>Requested path:</strong> <code>{{ path }}</code>
+  </div>
+  {% endif %}
+
+  <div style="margin-top: 2rem;">
+    <a href="javascript:history.back()" style="margin-right: 1rem;">← Go Back</a>
+    <a href="/" style="text-decoration: underline;">Go to Home</a>
+  </div>
+
+  <div style="margin-top: 3rem; color: #999; font-size: 0.9rem;">
+    <p>Useful pages:</p>
+    <a href="/login" style="margin: 0 0.5rem;">Login</a>
+    <a href="/register" style="margin: 0 0.5rem;">Register</a>
+    <a href="/dashboard" style="margin: 0 0.5rem;">Dashboard</a>
+  </div>
+</section>
+{% endblock %}

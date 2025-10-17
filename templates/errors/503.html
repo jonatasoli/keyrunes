@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card" style="text-align: center; padding: 3rem;">
+  <h1 style="font-size: 4rem; color: #9b59b6; margin: 0;">503</h1>
+  <h2 style="color: #555; margin: 1rem 0;">Service Temporarily Unavailable</h2>
+  
+  <p style="color: #666; max-width: 500px; margin: 1.5rem auto;">
+    The service is temporarily unavailable due to maintenance or overload. Please try again in a few moments.
+  </p>
+
+  {% if retry_after %}
+  <div style="background: #f3e5f5; border: 1px solid #9b59b6; border-radius: 4px; padding: 1rem; margin: 1.5rem auto; max-width: 500px;">
+    <strong>Try again in:</strong> {{ retry_after }} seconds
+  </div>
+  {% endif %}
+
+  <div style="margin-top: 2rem;">
+    <button onclick="location.reload()" style="margin-right: 1rem; padding: 0.5rem 1rem; cursor: pointer;">
+      🔄 Try Again
+    </button>
+    <a href="/" style="text-decoration: underline;">Go to Home</a>
+  </div>
+
+  <div style="margin-top: 3rem; padding: 1rem; background: #f8f9fa; border-radius: 4px; max-width: 500px; margin-left: auto; margin-right: auto;">
+    <p style="font-size: 0.9rem; color: #666; margin: 0;">
+      💡 <strong>System Status:</strong> You can check the real-time system status on our <a href="/api/health">health check page</a>.
+    </p>
+  </div>
+
+  <script>
+    // Auto-refresh after specified time
+    {% if retry_after %}
+    setTimeout(function() {
+      location.reload();
+    }, {{ retry_after }} * 1000);
+    {% endif %}
+  </script>
+</section>
+{% endblock %}

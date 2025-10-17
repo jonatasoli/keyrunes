@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card" style="text-align: center; padding: 3rem;">
+  <h1 style="font-size: 4rem; color: #e74c3c; margin: 0;">500</h1>
+  <h2 style="color: #555; margin: 1rem 0;">Internal Server Error</h2>
+  
+  <p style="color: #666; max-width: 500px; margin: 1.5rem auto;">
+    Something went wrong on the server while processing your request. Our team has been notified and is working to resolve the issue.
+  </p>
+
+  {% if error_id %}
+  <div style="background: #ffe8e8; border: 1px solid #e74c3c; border-radius: 4px; padding: 1rem; margin: 1.5rem auto; max-width: 500px;">
+    <strong>Error ID:</strong> <code>{{ error_id }}</code>
+    <p style="font-size: 0.85rem; margin-top: 0.5rem;">
+      Use this ID when contacting support.
+    </p>
+  </div>
+  {% endif %}
+
+  <div style="margin-top: 2rem;">
+    <a href="javascript:location.reload()" style="margin-right: 1rem;">🔄 Try Again</a>
+    <a href="/" style="text-decoration: underline;">Go to Home</a>
+  </div>
+
+  <div style="margin-top: 3rem; padding: 1rem; background: #f8f9fa; border-radius: 4px; max-width: 500px; margin-left: auto; margin-right: auto;">
+    <p style="font-size: 0.9rem; color: #666; margin: 0;">
+      💡 <strong>Tip:</strong> If the problem persists, try clearing your browser cache or contact support at <a href="mailto:contact@jonatasoliveira.dev">contact@jonatasoliveira.dev</a>
+    </p>
+  </div>
+</section>
+{% endblock %}

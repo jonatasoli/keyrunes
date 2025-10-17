@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card" style="text-align: center; padding: 3rem;">
+  <h1 style="font-size: 4rem; color: #f39c12; margin: 0;">403</h1>
+  <h2 style="color: #555; margin: 1rem 0;">Access Denied</h2>
+  
+  <p style="color: #666; max-width: 500px; margin: 1.5rem auto;">
+    You do not have permission to access this resource. This can happen if you are not authenticated or do not have the necessary permissions.
+  </p>
+
+  {% if required_permission %}
+  <div style="background: #fff3cd; border: 1px solid #f39c12; border-radius: 4px; padding: 1rem; margin: 1.5rem auto; max-width: 500px;">
+    <strong>Required permission:</strong> {{ required_permission }}
+  </div>
+  {% endif %}
+
+  <div style="margin-top: 2rem;">
+    <a href="/login" style="margin-right: 1rem;">🔑 Login</a>
+    <a href="/" style="text-decoration: underline;">Go to Home</a>
+  </div>
+
+  <div style="margin-top: 3rem; padding: 1rem; background: #f8f9fa; border-radius: 4px; max-width: 500px; margin-left: auto; margin-right: auto;">
+    <p style="font-size: 0.9rem; color: #666; margin: 0;">
+      💡 If you believe you should have access to this resource, please contact the system administrator.
+    </p>
+  </div>
+</section>
+{% endblock %}

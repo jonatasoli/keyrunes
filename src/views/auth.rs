@@ -1,4 +1,3 @@
-use axum::http::header::SET_COOKIE;
 use axum::{
     extract::{Extension, Form, Query},
     http::{HeaderMap, StatusCode},
@@ -25,7 +24,7 @@ pub struct RegisterForm {
 
 #[derive(serde::Deserialize)]
 pub struct LoginForm {
-    pub identity: String, // email ou username
+    pub identity: String,
     pub password: String,
 }
 
@@ -41,7 +40,7 @@ pub struct ResetPasswordQuery {
     pub forgot_password: String,
 }
 
-// GET /register
+/// GET /register
 pub async fn register_page(Extension(tmpl): Extension<tera::Tera>) -> impl IntoResponse {
     let mut ctx = Context::new();
     ctx.insert("title", "Register");
@@ -49,7 +48,7 @@ pub async fn register_page(Extension(tmpl): Extension<tera::Tera>) -> impl IntoR
     Html(body)
 }
 
-// POST /register
+/// POST /register
 pub async fn register_post(
     Extension(service): Extension<Arc<UserServiceType>>,
     Extension(tmpl): Extension<tera::Tera>,
@@ -73,7 +72,6 @@ pub async fn register_post(
             if auth_response.requires_password_change {
                 return Redirect::to("/change-password").into_response();
             }
-
             Redirect::to("/dashboard").into_response()
         }
         Err(e) => {
@@ -86,7 +84,7 @@ pub async fn register_post(
     }
 }
 
-// GET /login
+/// GET /login
 pub async fn login_page(Extension(tmpl): Extension<tera::Tera>) -> impl IntoResponse {
     let mut ctx = Context::new();
     ctx.insert("title", "Login");
@@ -94,7 +92,7 @@ pub async fn login_page(Extension(tmpl): Extension<tera::Tera>) -> impl IntoResp
     Html(body)
 }
 
-// POST /login
+/// POST /login
 pub async fn login_post(
     Extension(service): Extension<Arc<UserServiceType>>,
     Extension(tmpl): Extension<tera::Tera>,
@@ -103,7 +101,6 @@ pub async fn login_post(
     match service.login(payload.identity, payload.password).await {
         Ok(auth_response) => {
             if auth_response.requires_password_change {
-                // Redirect to password change page for first login
                 let mut ctx = Context::new();
                 ctx.insert("title", "Change Password Required");
                 ctx.insert("user", &auth_response.user);
@@ -112,17 +109,12 @@ pub async fn login_post(
                 return (StatusCode::OK, Html(body)).into_response();
             }
 
-            // Normal login, redirect to dashboard - template is being rendered not redirected
             let mut ctx = Context::new();
             ctx.insert("title", "Dashboard");
             ctx.insert("user", &auth_response.user);
             ctx.insert("token", &auth_response.token);
-
-            let mut headers = HeaderMap::new();
-
-            headers.insert(SET_COOKIE, auth_response.token.parse().unwrap());
-
-            (headers, Redirect::to("/dashboard")).into_response()
+            let body = tmpl.render("dashboard.html", &ctx).unwrap();
+            (StatusCode::OK, Html(body)).into_response()
         }
         Err(e) => {
             let mut ctx = Context::new();
@@ -134,7 +126,7 @@ pub async fn login_post(
     }
 }
 
-// GET /change-password
+/// GET /change-password
 pub async fn change_password_page(
     Extension(tmpl): Extension<tera::Tera>,
     headers: HeaderMap,
@@ -142,7 +134,6 @@ pub async fn change_password_page(
     let mut ctx = Context::new();
     ctx.insert("title", "Change Password");
 
-    // Check if user is authenticated via JWT token
     if let Some(token) = extract_bearer_token_from_cookie_or_header(&headers) {
         ctx.insert("token", &token);
     }
@@ -151,14 +142,13 @@ pub async fn change_password_page(
     Html(body)
 }
 
-// POST /change-password
+/// POST /change-password
 pub async fn change_password_post(
     Extension(service): Extension<Arc<UserServiceType>>,
     Extension(tmpl): Extension<tera::Tera>,
     headers: HeaderMap,
     Form(payload): Form<ChangePasswordForm>,
 ) -> impl IntoResponse {
-    // Extract JWT token from headers or cookies
     let token = match extract_bearer_token_from_cookie_or_header(&headers) {
         Some(token) => token,
         None => {
@@ -173,7 +163,6 @@ pub async fn change_password_post(
         }
     };
 
-    // Validate password confirmation
     if payload.new_password != payload.confirm_password {
         let mut ctx = Context::new();
         ctx.insert("title", "Change Password");
@@ -188,10 +177,7 @@ pub async fn change_password_post(
     };
 
     match service.change_password(user_id, req).await {
-        Ok(_) => {
-            // Password changed successfully, redirect to dashboard
-            Redirect::to("/dashboard").into_response()
-        }
+        Ok(_) => Redirect::to("/dashboard").into_response(),
         Err(e) => {
             let mut ctx = Context::new();
             ctx.insert("title", "Change Password");
@@ -202,7 +188,7 @@ pub async fn change_password_post(
     }
 }
 
-// GET /dashboard
+/// GET /dashboard
 pub async fn dashboard_page(
     Extension(service): Extension<Arc<UserServiceType>>,
     Extension(tmpl): Extension<tera::Tera>,
@@ -227,7 +213,7 @@ pub async fn dashboard_page(
     }
 }
 
-// GET /reset-password?forgot_password=TOKEN
+/// GET /reset-password?forgot_password=TOKEN
 pub async fn reset_password_page(
     Extension(tmpl): Extension<tera::Tera>,
     Query(params): Query<ResetPasswordQuery>,
@@ -246,23 +232,34 @@ pub async fn reset_password_page(
     }
 }
 
-// Helper function to extract Bearer token from Authorization header or cookies
+/// Helper function to extract Bearer token from Authorization header or cookies
+/// 
+/// FIXED: Properly handles cookie parsing without panicking
 fn extract_bearer_token_from_cookie_or_header(headers: &HeaderMap) -> Option<String> {
-    // First try to get from Authorization header
+    // First try Authorization header
     if let Some(auth_header) = headers.get("authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
-            if auth_str.starts_with("Bearer ") {
+            if auth_str.starts_with("Bearer ") && auth_str.len() > 7 {
                 return Some(auth_str[7..].to_string());
             }
         }
     }
 
-    // Then try to get from cookies
+    // Then try cookies
     if let Some(cookie_header) = headers.get("cookie") {
         if let Ok(cookie_str) = cookie_header.to_str() {
-            let cookies = cookie_str.split("; ").collect::<Vec<&str>>();
-            let jwt_token = cookies[1].trim().to_string();
-            return Some(jwt_token);
+            // Parse cookies safely
+            for cookie in cookie_str.split(';') {
+                let cookie = cookie.trim();
+                
+                // Check if this is a jwt_token cookie
+                if let Some(token_value) = cookie.strip_prefix("jwt_token=") {
+                    // Only return if there's actually a value
+                    if !token_value.is_empty() {
+                        return Some(token_value.to_string());
+                    }
+                }
+            }
         }
     }
 
@@ -299,8 +296,56 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_token_from_cookie_only() {
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", HeaderValue::from_static("jwt_token=abc123"));
+
+        let token = extract_bearer_token_from_cookie_or_header(&headers);
+        assert_eq!(token, Some("abc123".to_string()));
+    }
+
+    #[test]
+    fn test_extract_token_from_cookie_with_spaces() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "cookie",
+            HeaderValue::from_static(" jwt_token=token123 ; other=val "),
+        );
+
+        let token = extract_bearer_token_from_cookie_or_header(&headers);
+        assert_eq!(token, Some("token123".to_string()));
+    }
+
+    #[test]
+    fn test_extract_token_empty_cookie() {
+        let mut headers = HeaderMap::new();
+        headers.insert("cookie", HeaderValue::from_static("jwt_token="));
+
+        let token = extract_bearer_token_from_cookie_or_header(&headers);
+        assert_eq!(token, None);
+    }
+
+    #[test]
     fn test_extract_token_missing() {
         let headers = HeaderMap::new();
+        let token = extract_bearer_token_from_cookie_or_header(&headers);
+        assert_eq!(token, None);
+    }
+
+    #[test]
+    fn test_extract_token_invalid_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", HeaderValue::from_static("Basic xyz"));
+
+        let token = extract_bearer_token_from_cookie_or_header(&headers);
+        assert_eq!(token, None);
+    }
+
+    #[test]
+    fn test_extract_token_bearer_too_short() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", HeaderValue::from_static("Bearer "));
+
         let token = extract_bearer_token_from_cookie_or_header(&headers);
         assert_eq!(token, None);
     }

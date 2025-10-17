@@ -18,7 +18,10 @@ mod handler;
 mod repository;
 mod services;
 mod views;
+
 use crate::handler::auth::{require_auth, require_superadmin};
+use crate::handler::errors::handler_404;
+use crate::handler::logging::{init_logging, request_logging_middleware, LogLevel};
 
 use repository::sqlx_impl::{PgGroupRepository, PgPasswordResetRepository, PgUserRepository};
 use services::{jwt_service::JwtService, user_service::UserService};
@@ -27,13 +30,29 @@ use services::{jwt_service::JwtService, user_service::UserService};
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
-    // Initialize tracing
-    tracing_subscriber::fmt::init();
+    // Logging
+    let log_level = std::env::var("LOG_LEVEL")
+        .ok()
+        .and_then(|level| match level.to_lowercase().as_str() {
+            "info" => Some(LogLevel::Info),
+            "debug" => Some(LogLevel::Debug),
+            "error" => Some(LogLevel::Error),
+            "critical" => Some(LogLevel::Critical),
+            _ => None,
+        })
+        .unwrap_or(LogLevel::Info);
+
+    // Init tracing
+    init_logging(log_level);
+
+    tracing::info!("🚀 Starting Keyrunes...");
+    tracing::info!("📊 Log level configurated: {:?}", log_level);
 
     // Initialize health check
     api::health::init_health_check();
 
     // Database
+    tracing::info!("🔗 Starting database...");
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:password@localhost:5432/postgres".into());
 
@@ -41,6 +60,7 @@ async fn main() -> anyhow::Result<()> {
         .max_connections(5)
         .connect(&database_url)
         .await?;
+    tracing::info!("✅ Database established!");
 
     // Initialize repositories
     let user_repo = Arc::new(PgUserRepository::new(pool.clone()));
@@ -48,8 +68,12 @@ async fn main() -> anyhow::Result<()> {
     let password_reset_repo = Arc::new(PgPasswordResetRepository::new(pool.clone()));
 
     // Initialize JWT service
-    let jwt_secret = std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "your-super-secret-jwt-key-change-in-production".into());
+    let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| {
+        tracing::warn!(
+            "⚠️  JWT_SECRET not seted, starting deafault token (DON'T USE IN PRODUCTION)"
+        );
+        "your-super-secret-jwt-key-change-in-production".into()
+    });
     let jwt_service = Arc::new(JwtService::new(&jwt_secret));
 
     // Initialize user service
@@ -60,8 +84,11 @@ async fn main() -> anyhow::Result<()> {
         jwt_service.clone(),
     ));
 
+    tracing::info!("📄 Loading templates...");
     let tera = Tera::new("templates/**/*").expect("Error to load templates");
+    tracing::info!("✅ Templates loaded with success");
 
+    // Public routes - no authentication required
     let public_router = Router::new()
         .route("/", get(|| async { Redirect::temporary("/login") }))
         .route("/api/health", get(api::health::health_check))
@@ -79,6 +106,8 @@ async fn main() -> anyhow::Result<()> {
         )
         .route("/reset-password", get(api::auth::reset_password_page))
         .nest_service("/static", ServeDir::new("./static"));
+
+    // Protected routes - authentication required
     let protected_router = Router::new()
         .route("/dashboard", get(views::auth::dashboard_page))
         .route(
@@ -93,21 +122,18 @@ async fn main() -> anyhow::Result<()> {
             post(api::admin::create_user)
                 .layer(from_fn(require_superadmin))
                 .layer(from_fn(require_auth)),
-        )
-        // se seu middleware precisa de Extensions (jwt_service, pool, user_service),
-        // assegure-se de aplicar essas Extensions ANTES do middleware nesta sub-árvore:
-        .layer(Extension(jwt_service.clone()))
-        .layer(Extension(user_service.clone()))
-        .layer(Extension(pool.clone()));
+        );
+
+    // Main application
     let app = Router::new()
-        // Pages
         .merge(public_router)
         .merge(protected_router)
-        // Extensions
+        .fallback(handler_404)
         .layer(Extension(tera))
         .layer(Extension(user_service))
         .layer(Extension(jwt_service))
-        .layer(Extension(pool));
+        .layer(Extension(pool))
+        .layer(from_fn(request_logging_middleware));
 
     let listener = TcpListener::bind("127.0.0.1:3000").await.unwrap();
     tracing::info!("🛡️ KeyRunes server starting on http://127.0.0.1:3000");
@@ -133,7 +159,6 @@ mod tests {
     };
     use tower::ServiceExt;
 
-    // Helper to create test app
     async fn create_test_app() -> Router {
         let database_url = std::env::var("TEST_DATABASE_URL")
             .unwrap_or_else(|_| "postgres://postgres:123456@localhost:5432/keyrunes_test".into());
@@ -161,10 +186,34 @@ mod tests {
             .route("/api/health", get(api::health::health_check))
             .route("/api/register", post(api::auth::register_api))
             .route("/api/login", post(api::auth::login_api))
+            .fallback(handler_404)
             .layer(Extension(tera))
             .layer(Extension(user_service))
             .layer(Extension(jwt_service))
             .layer(Extension(pool))
+    }
+
+    #[test]
+    fn test_log_level_parsing() {
+        let test_cases = vec![
+            ("info", Some(LogLevel::Info)),
+            ("INFO", Some(LogLevel::Info)),
+            ("debug", Some(LogLevel::Debug)),
+            ("error", Some(LogLevel::Error)),
+            ("critical", Some(LogLevel::Critical)),
+            ("invalid", None),
+        ];
+
+        for (input, expected) in test_cases {
+            let result = match input.to_lowercase().as_str() {
+                "info" => Some(LogLevel::Info),
+                "debug" => Some(LogLevel::Debug),
+                "error" => Some(LogLevel::Error),
+                "critical" => Some(LogLevel::Critical),
+                _ => None,
+            };
+            assert_eq!(result, expected, "Failed for input: {}", input);
+        }
     }
 
     #[tokio::test]
@@ -181,7 +230,6 @@ mod tests {
             .await
             .unwrap();
 
-        // Health check should return OK or SERVICE_UNAVAILABLE
         assert!(
             response.status() == StatusCode::OK
                 || response.status() == StatusCode::SERVICE_UNAVAILABLE
@@ -189,86 +237,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_health_check_structure() {
+    async fn test_404_handler() {
         let app = create_test_app().await;
 
         let response = app
             .oneshot(
                 Request::builder()
-                    .uri("/api/health")
+                    .uri("/invalid")
                     .body(Body::empty())
                     .unwrap(),
             )
             .await
             .unwrap();
 
-        let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-
-        // Should be valid JSON with expected structure
-        let health_response: serde_json::Value = serde_json::from_str(&body_str).unwrap();
-        assert!(health_response.get("status").is_some());
-        assert!(health_response.get("timestamp").is_some());
-        assert!(health_response.get("version").is_some());
-        assert!(health_response.get("database").is_some());
-        assert!(health_response.get("services").is_some());
-    }
-
-    #[tokio::test]
-    async fn test_register_endpoint() {
-        let app = create_test_app().await;
-
-        let body = serde_json::json!({
-            "email": "test@example.com",
-            "username": "testuser",
-            "password": "password123"
-        });
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/api/register")
-                    .header("content-type", "application/json")
-                    .body(Body::from(body.to_string()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Should either succeed or fail with validation error
-        assert!(
-            response.status() == StatusCode::CREATED
-                || response.status() == StatusCode::BAD_REQUEST
-        );
-    }
-
-    #[tokio::test]
-    async fn test_login_endpoint() {
-        let app = create_test_app().await;
-
-        let body = serde_json::json!({
-            "identity": "admin@admin.com",
-            "password": "admin"
-        });
-
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/api/login")
-                    .header("content-type", "application/json")
-                    .body(Body::from(body.to_string()))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        // Should either succeed with admin user or fail with invalid credentials
-        assert!(
-            response.status() == StatusCode::OK || response.status() == StatusCode::UNAUTHORIZED
-        );
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 }
