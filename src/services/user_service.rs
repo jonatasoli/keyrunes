@@ -1,7 +1,5 @@
 use crate::domain::user::{Email, Password};
-use crate::repository::{
-    GroupRepository, NewPasswordResetToken, NewUser, PasswordResetRepository, UserRepository,
-};
+use crate::repository::{GroupRepository, NewPasswordResetToken, NewUser, PasswordResetRepository, PasswordResetToken, User, UserRepository};
 use crate::services::jwt_service::JwtService;
 use anyhow::{Result, anyhow};
 use argon2::{
@@ -59,6 +57,12 @@ pub struct AuthResponse {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChangePasswordRequest {
     pub current_password: String,
+    pub new_password: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AdminChangePasswordRequest {
+    pub user_id: i64,
     pub new_password: String,
 }
 
@@ -323,6 +327,41 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
         Ok(())
     }
 
+    pub async fn update_password(&self, req: AdminChangePasswordRequest) -> Result<()> {
+        // Validate new password
+        if req.new_password.len() < 8 {
+            return Err(anyhow!("new password too short"));
+        }
+
+        // Hash new password
+        let new_password_hash = self.hash_password(&req.new_password)?;
+
+        // Update password
+        self.user_repo
+            .update_user_password(req.user_id, &new_password_hash)
+            .await?;
+
+        Ok(())
+    }
+    
+    pub async fn find_user_by_username(&self, username: &String) -> Option<User> {
+        let user: Option<User> = self
+                .user_repo
+                .find_by_username(username.as_str())
+                .await
+                .unwrap();
+        user
+    }
+
+    pub async fn find_user_by_email(&self, email: &String) -> Option<User> {
+        let user: Option<User> = self
+                .user_repo
+                .find_by_email(email.as_str())
+                .await
+                .unwrap();
+        user
+    }
+
     pub async fn refresh_token(&self, token: &str) -> Result<String> {
         self.jwt_service.refresh_token(token)
     }
@@ -350,7 +389,7 @@ impl<U: UserRepository, G: GroupRepository, P: PasswordResetRepository> UserServ
         })
     }
 
-    async fn get_user_group_names(&self, user_id: i64) -> Result<Vec<String>> {
+    pub async fn get_user_group_names(&self, user_id: i64) -> Result<Vec<String>> {
         let groups = self.user_repo.get_user_groups(user_id).await?;
         Ok(groups.into_iter().map(|g| g.name).collect())
     }

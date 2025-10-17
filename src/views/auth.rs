@@ -113,11 +113,6 @@ pub async fn login_post(
             }
 
             // Normal login, redirect to dashboard - template is being rendered not redirected
-            let mut ctx = Context::new();
-            ctx.insert("title", "Dashboard");
-            ctx.insert("user", &auth_response.user);
-            ctx.insert("token", &auth_response.token);
-
             let mut headers = HeaderMap::new();
 
             headers.insert(SET_COOKIE, auth_response.token.parse().unwrap());
@@ -260,9 +255,16 @@ fn extract_bearer_token_from_cookie_or_header(headers: &HeaderMap) -> Option<Str
     // Then try to get from cookies
     if let Some(cookie_header) = headers.get("cookie") {
         if let Ok(cookie_str) = cookie_header.to_str() {
-            let cookies = cookie_str.split("; ").collect::<Vec<&str>>();
-            let jwt_token = cookies[1].trim().to_string();
-            return Some(jwt_token);
+            if cookie_str.contains(";"){
+                for cookie in cookie_str.split(";") {
+                    let cookie = cookie.trim();
+                    if cookie.starts_with("jwt_token=") {
+                        return Some(cookie[10..].to_string())
+                    }
+                }
+            }
+
+            return Some(cookie_str.to_string());
         }
     }
 
@@ -275,7 +277,7 @@ mod tests {
     use axum::http::{HeaderMap, HeaderValue};
 
     #[test]
-    fn test_extract_token_from_header() {
+    fn test_extract_token_with_bearer_authorization_from_header() {
         let mut headers = HeaderMap::new();
         headers.insert(
             "authorization",
@@ -287,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_token_from_cookie() {
+    fn test_extract_jwt_token_from_multiple_cookies() {
         let mut headers = HeaderMap::new();
         headers.insert(
             "cookie",
@@ -299,7 +301,19 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_token_missing() {
+    fn test_extract_token_from_single_cookie() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "cookie",
+            HeaderValue::from_static("token1234"),
+        );
+
+        let token = extract_bearer_token_from_cookie_or_header(&headers);
+        assert_eq!(token, Some("token1234".to_string()));
+    }
+
+    #[test]
+    fn test_missing_token_should_return_none() {
         let headers = HeaderMap::new();
         let token = extract_bearer_token_from_cookie_or_header(&headers);
         assert_eq!(token, None);
