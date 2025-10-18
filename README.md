@@ -1,4 +1,5 @@
 # 🛡️ KeyRunes — Modern Access Control Engine in Rust
+[![CI](https://github.com/jonatasoli/keyrunes/actions/workflows/ci.yml/badge.svg)](https://github.com/jonatasoli/keyrunes/actions/workflows/ci.yml)
 
 **KeyRunes** is a high-performance, extensible authorization system designed to compete with and surpass traditional solutions like Keycloak. It brings together advanced access control models such as **RBAC**, **ABAC**, **ReBAC**, and **PBAC**, while offering a great developer experience and enterprise-grade scalability.
 
